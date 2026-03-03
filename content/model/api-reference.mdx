@@ -102,6 +102,8 @@ The Model Service routes requests to the appropriate provider based on the model
 |----------|--------|-----------------|
 | OpenAI | `gpt-4o`, `gpt-4o-mini`, `gpt-4.1-*` | `OPENAI_API_KEY` |
 | Anthropic | `claude-*` | `ANTHROPIC_API_KEY` |
+| OpenRouter | `anthropic/*`, `deepseek/*`, `openai/*`, 200+ models | `OPENROUTER_API_KEY` |
+| Anthropic Sub | `claude-*` (via subscription proxy) | `ANTHROPIC_SUB_PROXY_URL` |
 | Ollama | `llama*`, `mistral*`, `codellama*` | Local (no key needed) |
 | Cerebras | `cerebras-*` | `CEREBRAS_API_KEY` |
 | YYDS | `yyds-*` | `YYDS_API_KEY` |
@@ -248,6 +250,88 @@ curl -X POST http://localhost:8082/api/v1/models/inference/ml/prediction/models/
 
 List prediction runs for a model. Supports pagination (`limit`, `offset`).
 
+## Voice & Realtime
+
+### POST `/realtime/sessions`
+
+Create a new realtime voice session. Returns a WebSocket URL for bidirectional audio streaming.
+
+```bash
+curl -X POST http://localhost:8082/realtime/sessions \
+  -H "Content-Type: application/json" \
+  -H "x-user-id: user-123" \
+  -d '{
+    "model": "gpt-4o-realtime-preview",
+    "voice": "alloy",
+    "instructions": "You are a helpful assistant",
+    "metadata": {"session_type": "support"}
+  }'
+```
+
+**Response:**
+
+```json
+{
+  "session_id": "sess_abc123",
+  "websocket_url": "ws://localhost:8082/realtime/ws/sess_abc123?token=sess_abc123",
+  "expires_at": "2026-03-02T12:15:00Z",
+  "model": "gpt-4o-realtime-preview",
+  "voice": "alloy"
+}
+```
+
+### GET `/realtime/ws/{session_id}`
+
+WebSocket endpoint for bidirectional voice streaming. Proxies between client and upstream realtime API with event normalization, privacy filtering, and metrics collection.
+
+**Session config sent upstream:**
+- Modalities: `["text", "audio"]`
+- Audio format: `pcm16`
+- Turn detection: `server_vad` (threshold 0.5, silence duration 200ms)
+- Input transcription: `whisper-1`
+
+### POST `/realtime/sessions/{session_id}/interrupt`
+
+Send a barge-in signal to cancel the current response and clear the audio buffer.
+
+```bash
+curl -X POST http://localhost:8082/realtime/sessions/sess_abc123/interrupt
+```
+
+---
+
+## Intelligent Model Routing
+
+### POST `/api/v1/invoke/v2`
+
+Extended invoke route with role-based resolution, capability filtering, and cost-aware ranking.
+
+**Additional request fields (beyond standard `/invoke`):**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `role` | `string` | Agent role (`reasoning`, `response`, `coding`, `default`) |
+| `preferred_max_latency_ms` | `number` | Soft latency constraint |
+| `preferred_max_cost_per_token` | `number` | Soft cost constraint |
+
+**Resolution priority:**
+1. Explicit `model` + `provider` in request
+2. Role-based defaults (see table below)
+3. Capability-filtered candidates ranked by cost
+4. Service type defaults
+
+**Service type defaults:**
+
+| Service Type | Default Model | Provider |
+|-------------|--------------|----------|
+| `text` | gpt-5-nano | openai |
+| `vision` | gpt-5-mini | openai |
+| `audio` | whisper-1 | openai |
+| `image` | flux-schnell | replicate |
+| `embedding` | text-embedding-3-small | openai |
+
+---
+
 ## Multi-Modal Support
 
 The invoke endpoint supports multi-modal inputs depending on the provider and model:
@@ -289,6 +373,8 @@ async with AsyncISAModel(base_url="http://localhost:8082") as client:
 |----------|----------|-------------|
 | `OPENAI_API_KEY` | For OpenAI models | OpenAI provider key |
 | `ANTHROPIC_API_KEY` | For Claude models | Anthropic provider key |
+| `OPENROUTER_API_KEY` | For OpenRouter models | OpenRouter provider key |
+| `ANTHROPIC_SUB_PROXY_URL` | For subscription proxy | Local proxy URL (default: `http://localhost:5005/v1`) |
 | `YYDS_API_KEY` | For YYDS models | YYDS provider key |
 | `REDIS_URL` | For caching | Redis connection URL |
 | `QDRANT_URL` | For semantic cache | Qdrant connection URL |

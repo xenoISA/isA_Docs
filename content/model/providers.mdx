@@ -10,6 +10,8 @@ isA Model supports multiple providers, each with different strengths:
 |----------|----------|--------|
 | `openai` | General purpose, latest models | gpt-4.1-nano, gpt-4o, o4-mini |
 | `anthropic` | Long context, safety | claude-3-opus, claude-3-sonnet |
+| `openrouter` | Multi-model access, reasoning | 200+ models including deepseek-r1, o1/o3 |
+| `anthropic-sub` | Flat-rate Claude access | claude-sonnet-4-20250514 via subscription proxy |
 | `yyds` | Cost optimization (proxy) | gpt-4o-mini, gpt-4o |
 | `cerebras` | Ultra-fast inference | llama-3.3-70b |
 | `ollama` | Local/private deployment | llama3, mistral, codellama |
@@ -24,6 +26,15 @@ isA Model supports multiple providers, each with different strengths:
 export OPENAI_API_KEY="sk-..."
 export ANTHROPIC_API_KEY="sk-ant-..."
 export CEREBRAS_API_KEY="..."
+
+# OpenRouter (multi-model gateway)
+export OPENROUTER_API_KEY="sk-or-..."
+export OPENROUTER_HTTP_REFERER="https://your-app.com"
+export OPENROUTER_X_TITLE="Your App Name"
+
+# Anthropic Subscription Proxy (flat-rate Claude access)
+export ANTHROPIC_SUB_PROXY_URL="http://localhost:5005/v1"
+export ANTHROPIC_SUB_API_KEY="sk-proxy"
 
 # Proxy providers
 export YYDS_API_KEY="..."
@@ -101,6 +112,40 @@ llm = factory.get_service("text", "cerebras", "llama-3.3-70b")
 # Great for real-time applications
 async for token in llm.astream("Hello!"):
     print(token, end="")  # Very fast token generation
+```
+
+### OpenRouter (Multi-Model Gateway)
+
+```python
+# Access 200+ models from a single API
+llm = factory.get_service("text", "openrouter", "anthropic/claude-3.5-sonnet")
+
+# Reasoning models detected automatically (deepseek-r1, o1/o3, :thinking suffix)
+llm_reasoning = factory.get_service("text", "openrouter", "deepseek/deepseek-r1")
+response = await llm_reasoning.ainvoke(
+    "Solve this step by step",
+    show_reasoning=True,  # Include reasoning tokens in response
+)
+
+# Token usage includes reasoning_tokens
+usage = llm_reasoning.get_token_usage()
+print(f"Reasoning tokens: {usage['reasoning_tokens']}")
+```
+
+### Anthropic Subscription Proxy
+
+Access Claude models via flat-rate subscription plans through a local proxy:
+
+```python
+# Routes through local CLIProxyAPI (OpenAI-compatible endpoint)
+llm = factory.get_service("text", "anthropic-sub", "claude-sonnet-4-20250514")
+
+# Built-in rotation retry for subscription account management
+# Automatically retries on RateLimitError with 2-second delay
+response = await llm.ainvoke("Hello!")
+
+info = llm.get_model_info()
+print(info["subscription_proxy"])  # True
 ```
 
 ### YYDS (Cost-Optimized Proxy)

@@ -14,10 +14,10 @@ How the isA platform components work together.
 ┌─────────────────────────────────────────────────────────────────────────────────┐
 │                               AGENT SDK (Python)                                 │
 │                                                                                  │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐        │
-│  │    Agent     │  │   Workflow   │  │    Memory    │  │    Tools     │        │
-│  │   Runtime    │  │   Engine     │  │   Manager    │  │   Registry   │        │
-│  └──────────────┘  └──────────────┘  └──────────────┘  └──────────────┘        │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌────────┐│
+│  │  Agent   │ │ Workflow │ │  Memory  │ │  Tools   │ │  Voice   │ │  A2A   ││
+│  │  Runtime │ │ Engine   │ │ Manager  │ │ Registry │ │ Service  │ │Protocol││
+│  └──────────┘ └──────────┘ └──────────┘ └──────────┘ └──────────┘ └────────┘│
 └─────────────────────────────────────────────────────────────────────────────────┘
                                         │
                     ┌───────────────────┼───────────────────┐
@@ -26,12 +26,12 @@ How the isA platform components work together.
 │     MCP SERVICE      │  │    MODEL SERVICE     │  │    USER SERVICES     │
 │                      │  │                      │  │                      │
 │  89+ Tools:          │  │  LLM Gateway:        │  │  35 Microservices:   │
-│  • Web Search        │  │  • Anthropic         │  │  • Authentication    │
-│  • File Operations   │  │  • OpenAI            │  │  • Payments          │
-│  • Code Execution    │  │  • Local (Ollama)    │  │  • Storage           │
-│  • Database          │  │  • Router            │  │  • Organizations     │
+│  • Web Search        │  │  • 8+ Providers      │  │  • Authentication    │
+│  • File Operations   │  │  • Role Routing      │  │  • Payments          │
+│  • Code Execution    │  │  • Voice/Realtime    │  │  • Storage           │
+│  • Marketplace       │  │  • ML Prediction     │  │  • Organizations     │
 │  • Browser           │  │  • Caching           │  │  • Devices (IoT)     │
-│  • APIs              │  │  • Rate Limiting     │  │  • Memory            │
+│  • APIs              │  │  • Cost Ranking      │  │  • Memory            │
 └──────────────────────┘  └──────────────────────┘  └──────────────────────┘
                     │                   │                   │
                     └───────────────────┼───────────────────┘
@@ -80,15 +80,19 @@ The Python SDK is the primary interface for building agents:
 | Component | Purpose |
 |-----------|---------|
 | **Agent Runtime** | Executes agent logic, manages state |
-| **Workflow Engine** | Orchestrates multi-step tasks |
+| **Workflow Engine** | Swarm handoffs and DAG orchestration |
 | **Memory Manager** | Handles short and long-term memory |
 | **Tools Registry** | Discovers and invokes tools |
+| **Voice Service** | Full-duplex voice with audio buffering and STT rewriting |
+| **A2A Protocol** | Agent-to-agent communication via Agent Card + JSON-RPC |
+| **Delegation** | Remote team task delegation with circuit breakers |
+| **Observability** | Prometheus metrics for nodes, models, tools, and pools |
 
 [Agent SDK Documentation →](/agent-sdk)
 
 ### MCP Service
 
-Model Context Protocol provides 89+ tools:
+Model Context Protocol provides 89+ tools with marketplace and multi-tenant security:
 
 | Category | Tools |
 |----------|-------|
@@ -97,6 +101,8 @@ Model Context Protocol provides 89+ tools:
 | **Code** | code_interpreter, shell, git |
 | **Data** | database_query, api_call, scrape |
 | **Browser** | browser_navigate, browser_click |
+| **Marketplace** | Package install, update, enable/disable |
+| **Security** | JWT/API key auth, command allowlist, SSE injection prevention |
 
 [MCP Documentation →](/mcp)
 
@@ -106,11 +112,12 @@ Unified LLM gateway with intelligent routing:
 
 | Feature | Description |
 |---------|-------------|
-| **Multi-Provider** | Anthropic, OpenAI, Google, local |
-| **Routing** | Automatic model selection |
-| **Caching** | Response caching for cost savings |
-| **Rate Limiting** | Per-user and global limits |
-| **Fallback** | Automatic failover |
+| **Multi-Provider** | OpenAI, Anthropic, OpenRouter, Cerebras, Ollama, YYDS, Replicate, Anthropic Sub |
+| **Intelligent Routing** | Role-based resolution, capability filtering, cost-aware ranking |
+| **Voice/Realtime** | WebSocket sessions with privacy filter and turn detection |
+| **ML Prediction** | Time-series forecasting with Prophet (training + inference) |
+| **Caching** | L1 exact-match (Redis) + L2 semantic (Qdrant) |
+| **Failover** | Automatic provider failover with circuit breakers |
 
 [Model Documentation →](/model)
 

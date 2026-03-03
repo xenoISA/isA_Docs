@@ -67,6 +67,45 @@ Supports:
 
 Register, connect, monitor, and route to external MCP servers with namespace-aware tool routing.
 
+### Marketplace
+
+Install, manage, and discover tool packages with org-scoped isolation:
+
+```bash
+# Search packages
+curl -X POST http://localhost:8081/api/v1/marketplace/search \
+  -H "Content-Type: application/json" \
+  -d '{"query": "data analysis", "category": "analytics"}'
+
+# Install a package
+curl -X POST http://localhost:8081/api/v1/marketplace/install \
+  -H "Content-Type: application/json" \
+  -d '{"name": "isa-analytics-tools", "version": "1.2.0", "auto_connect": true}'
+
+# Batch install
+curl -X POST http://localhost:8081/api/v1/marketplace/install/batch \
+  -H "Content-Type: application/json" \
+  -d '[{"name": "isa-analytics-tools"}, {"name": "isa-browser-tools"}]'
+
+# List installed
+curl http://localhost:8081/api/v1/marketplace/installed
+
+# Check for updates
+curl http://localhost:8081/api/v1/marketplace/updates
+```
+
+Package lifecycle: install → enable/disable → update → uninstall. All operations are scoped per organization.
+
+### Production Security
+
+Enterprise-grade security hardening across the platform:
+
+- **Authentication** — Unified auth middleware supporting JWT Bearer tokens and API keys (`X-API-Key`, `X-MCP-API-Key`). API keys in query parameters are explicitly rejected.
+- **Multi-org context** — `X-Organization-Id` header for org switching with validation against authorized orgs.
+- **Command safety** — Allowlist-based command validation with blocked patterns for injection, code execution, dangerous file ops, and sensitive file access. Max command length: 8192 bytes.
+- **Input validation** — Query length limits (≤1000 chars), result limits (≤50), threshold bounds ([0,1]), and regex-validated operation IDs for SSE streams.
+- **SSE injection prevention** — Operation IDs validated against `^[a-zA-Z0-9_-]{1,128}$` to prevent path traversal.
+
 ## Security & Operations
 
 - [Security](./security) - auth, authorization levels, SSRF/traversal/injection controls
@@ -85,6 +124,16 @@ Base URL: `http://localhost:8081`
 | `/progress/{id}/stream` | GET | SSE progress stream |
 | `/api/v1/skills/*` | - | Skill management |
 | `/api/v1/aggregator/*` | - | External server aggregation |
+| `/api/v1/marketplace/search` | POST | Search tool packages |
+| `/api/v1/marketplace/install` | POST | Install a package |
+| `/api/v1/marketplace/install/batch` | POST | Batch install packages |
+| `/api/v1/marketplace/installed` | GET | List installed packages |
+| `/api/v1/marketplace/updates` | GET | Check for available updates |
+| `/api/v1/marketplace/packages/{name}` | GET | Package details |
+| `/api/v1/marketplace/packages/{name}` | DELETE | Uninstall package |
+| `/api/v1/marketplace/packages/{name}/update` | POST | Update package version |
+| `/api/v1/marketplace/packages/{name}/enable` | POST | Enable package |
+| `/api/v1/marketplace/packages/{name}/disable` | POST | Disable package |
 
 ## Documentation
 

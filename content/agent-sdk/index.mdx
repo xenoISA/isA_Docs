@@ -245,6 +245,249 @@ async for msg in resume("my-task-123"):
 
 [Checkpointing documentation](./checkpointing)
 
+## Advanced Features
+
+### Voice Service
+
+Full-duplex voice conversations with audio buffering, speech-to-text rewriting, and barge-in support:
+
+```python
+from isa_agent_sdk.services.voice import VoiceOrchestrator, VoiceSessionConfig
+
+orchestrator = VoiceOrchestrator(
+    realtime_gateway_url="ws://localhost:8082/v1/realtime",
+    config=VoiceSessionConfig(
+        audio_format="pcm16",
+        sample_rate=16000,
+        barge_in_enabled=True,
+        turn_detection_threshold=0.5,
+    ),
+)
+
+await orchestrator.start_session()
+await orchestrator.process_audio(audio_chunk)
+await orchestrator.handle_barge_in()
+await orchestrator.stop_session()
+```
+
+Components:
+- **VoiceOrchestrator** — manages full-duplex sessions with mic state FSM (IDLE → LISTENING → THINKING → SPEAKING)
+- **AudioRingBuffer** — fixed-capacity circular buffer for audio frames
+- **DictationRewriter** — post-STT rewrite pipeline with filler removal, repetition cleanup, self-correction merge, and punctuation/casing
+
+### Multi-Agent Orchestration
+
+Build agent teams with dynamic handoffs and DAG execution:
+
+```python
+from isa_agent_sdk import Agent, ISAAgentOptions
+from isa_agent_sdk.agents.swarm import SwarmOrchestrator
+
+researcher = Agent(name="researcher", options=ISAAgentOptions(
+    allowed_tools=["web_search"], system_prompt="You research topics."
+))
+writer = Agent(name="writer", options=ISAAgentOptions(
+    system_prompt="You write articles based on research."
+))
+
+swarm = SwarmOrchestrator(
+    agents={"researcher": researcher, "writer": writer},
+    entry_agent="researcher",
+    max_handoffs=10,
+)
+
+# Sequential handoffs
+result = await swarm.run("Write an article about quantum computing")
+print(result.text)
+print(f"Handoff trace: {result.handoff_trace}")
+
+# DAG execution (parallel where possible)
+result = await swarm.run_dag(tasks=[...], parallel=True)
+```
+
+Also available: `MultiAgentOrchestrator` for router-based agent selection where a routing function picks the next agent at each step.
+
+[Workflows documentation](./workflows)
+
+### Delegation System
+
+Delegate tasks to remote agent teams via A2A protocol with circuit breaker protection:
+
+```python
+from isa_agent_sdk.delegation import (
+    DelegationClient, TeamDefinition, TeamRegistry, DelegationRequest
+)
+
+registry = TeamRegistry()
+registry.register(TeamDefinition(
+    name="data-team",
+    description="Handles data analysis tasks",
+    skills=["data-analysis", "visualization"],
+    url="http://data-agents:8102",
+    auth_token_env="DATA_TEAM_TOKEN",
+))
+
+client = DelegationClient(registry, circuit_breaker_threshold=3)
+result = await client.delegate(DelegationRequest(
+    team_name="data-team",
+    task="Analyze Q4 sales trends",
+    context={"dataset": "sales_2025"},
+))
+print(f"Status: {result.status}, Duration: {result.duration_ms}ms")
+```
+
+### Agent Lifecycle
+
+Manage long-running agent processes with graceful shutdown, heartbeats, and in-flight work tracking:
+
+```python
+from isa_agent_sdk.agents.lifecycle import AgentLifecycle
+
+lifecycle = AgentLifecycle(
+    name="my-worker",
+    drain_timeout=30.0,
+    heartbeat_interval=30.0,
+    on_start=lambda: print("Started"),
+    on_stop=lambda: print("Stopped"),
+)
+
+await lifecycle.start()
+
+# Track in-flight work — stop() waits for tracked work to complete
+async with lifecycle.track_work():
+    await process_task()
+
+print(lifecycle.health())  # {"state": "RUNNING", "uptime_seconds": ..., "in_flight_count": 0}
+
+await lifecycle.stop()  # Graceful drain, handles SIGTERM/SIGINT
+```
+
+States: `INITIALIZING → RUNNING → PAUSED → DRAINING → STOPPED`
+
+### Writer/Reviewer Pattern
+
+Quality-assured content generation with isolated review context:
+
+```python
+from isa_agent_sdk.agents.review import writer_reviewer_run
+
+result = await writer_reviewer_run(
+    writer=writer_agent,
+    reviewer=reviewer_agent,
+    prompt="Write a technical blog post about microservices",
+    max_rounds=2,
+    review_instructions="Check for technical accuracy and clarity",
+)
+
+print(f"Approved: {result.approved}")
+print(f"Rounds: {result.rounds_completed}")
+print(result.final_text)
+```
+
+The reviewer sees only the requirements and artifact (context-isolated), and can verdict `APPROVE`, `REVISE`, or `REJECT`.
+
+### Loop Detection
+
+Automatically detect stuck agents via tool repetition, cycle detection, and state convergence:
+
+```python
+from isa_agent_sdk.services.auto_detection.loop_detector import LoopDetector
+
+detector = LoopDetector(
+    repetition_threshold=3,
+    cycle_min_occurrences=2,
+    convergence_threshold=0.9,
+)
+
+detection = detector.check_tool_loop(tool_calls)
+if detection:
+    print(f"Loop type: {detection.loop_type}")  # tool_repetition, tool_cycle
+    print(f"Confidence: {detection.confidence}")
+    print(f"Suggestion: {detection.suggestion}")
+```
+
+### Runtime Observability
+
+Prometheus metrics for agent node execution, model calls, tool execution, and pool management:
+
+```python
+from isa_agent_sdk.services.observability.metrics import (
+    record_node_execution,
+    record_model_call,
+    record_tool_execution,
+    metrics_text,
+)
+
+# Automatically instrumented when prometheus_client is installed
+# Metrics include:
+# - agent_node_duration_seconds, agent_node_executions_total
+# - agent_model_call_duration_seconds, agent_model_tokens_total
+# - agent_tool_duration_seconds, agent_tool_executions_total
+# - agent_pool_acquire_duration_seconds, agent_pool_active_vms
+# - agent_hil_interrupts_total, agent_checkpoint_operations_total
+
+# Expose metrics endpoint
+metrics_bytes = metrics_text()
+```
+
+### TLS/mTLS Support
+
+Secure inter-service communication with TLS 1.2+ and optional mutual TLS:
+
+```python
+from isa_agent_sdk.core.resilience.tls import create_tls_client, get_uvicorn_tls_kwargs
+
+# Client with mTLS
+client = create_tls_client(
+    ca_bundle="/certs/ca.pem",
+    client_cert="/certs/client.pem",
+    client_key="/certs/client-key.pem",
+)
+
+# Server with TLS
+uvicorn_kwargs = get_uvicorn_tls_kwargs(
+    server_cert="/certs/server.pem",
+    server_key="/certs/server-key.pem",
+)
+```
+
+Environment variables: `ISA_TLS_ENABLED`, `ISA_TLS_CA_BUNDLE`, `ISA_TLS_CLIENT_CERT`, `ISA_TLS_CLIENT_KEY`, `ISA_TLS_MIN_VERSION`
+
+### Per-User Rate Limiting
+
+Tier-based rate limiting middleware with sliding window algorithm:
+
+```python
+from isa_agent_sdk.core.resilience.rate_limiter import RateLimitMiddleware, UserTier
+
+# Tier limits (requests per minute / daily):
+# FREE: 10/min, 100/day
+# STARTER: 30/min, 1000/day
+# PRO: 60/min, 5000/day
+# ENTERPRISE: 120/min, 50000/day
+
+# Add as FastAPI middleware — tier resolved from X-User-Tier header or JWT claim
+app.add_middleware(RateLimitMiddleware)
+```
+
+Response headers: `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`, `Retry-After`
+
+### Subscription Proxy
+
+Manage subscription-based provider lifecycles with health tracking and circuit breakers:
+
+```python
+from isa_agent_sdk.services.proxy import SubscriptionProxyManager
+
+manager = SubscriptionProxyManager()
+await manager.register_provider("anthropic-sub", config={...})
+await manager.start_provider("anthropic-sub")
+
+health = await manager.check_health()  # HEALTHY, DEGRADED, or UNHEALTHY
+```
+
+States: `STOPPED → STARTING → RUNNING → STOPPING → ERROR` with exponential backoff on failures.
+
 ### Deploy to isA Cloud
 
 Deploy your custom agents to production:
@@ -291,6 +534,12 @@ curl -X POST http://localhost:8095/api/v1/apps/{id}/query \
 - [Checkpointing](./checkpointing) - Durable execution
 - [Messages](./messages) - Message types reference
 
+### Advanced
+- [Workflows](./workflows) - Swarm, DAG, and multi-agent orchestration
+- [A2A](./a2a) - Agent-to-Agent protocol
+- [Memory](./memory) - Persistent memory backends
+- [API Reference](./api-reference) - Full API surface
+
 ### Deployment
 - [Deployment Guide](./deployment-guide) - Deploy agents to isA Cloud
 
@@ -309,6 +558,21 @@ curl -X POST http://localhost:8095/api/v1/apps/{id}/query \
 | `execute_tool(name, args)` | Execute tool directly |
 | `get_available_tools()` | List available tools |
 
+### Classes
+
+| Class | Description |
+|-------|-------------|
+| `Agent` | Reusable agent with name and options |
+| `ISAAgentOptions` | Configuration for agent behavior |
+| `ISAAgentClient` | Bidirectional client (local/remote) |
+| `SwarmOrchestrator` | Multi-agent swarm with handoffs |
+| `MultiAgentOrchestrator` | Router-based agent selection |
+| `DelegationClient` | Remote team delegation via A2A |
+| `AgentLifecycle` | Long-running agent state machine |
+| `VoiceOrchestrator` | Full-duplex voice session manager |
+| `LoopDetector` | Stuck agent detection |
+| `AgentTemplateStore` | Persistent agent template versioning |
+
 ### Message Types
 
 | Type | Description |
@@ -318,6 +582,7 @@ curl -X POST http://localhost:8095/api/v1/apps/{id}/query \
 | `tool_use` | Tool being called |
 | `tool_result` | Tool result |
 | `checkpoint` | Requires input |
+| `voice_*` | Voice session events |
 | `error` | Error message |
 
 ### Execution Modes

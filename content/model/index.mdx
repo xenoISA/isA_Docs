@@ -41,9 +41,19 @@ async with AsyncISAModel(base_url="http://localhost:8082") as client:
 ### Inference
 
 - OpenAI-compatible chat/completions interface
-- Multi-provider routing (OpenAI, Anthropic, Ollama, Cerebras, YYDS, Replicate)
+- Multi-provider routing (OpenAI, Anthropic, Ollama, Cerebras, YYDS, Replicate, OpenRouter, Anthropic Sub)
 - Streaming, tool-calling, and structured outputs
 - Multi-modal support (text, vision, audio, embedding, image, video)
+- Role-based and capability-based model resolution with cost-aware ranking
+
+### Voice & Realtime
+
+- WebSocket bidirectional proxy for real-time voice conversations
+- Session management with 15-minute TTL and reconnect window
+- Voice privacy filter with PII redaction (SSN, phone, email, credit card)
+- Configurable retention policies (STRICT, STANDARD, DEBUG)
+- Turn detection with server-side VAD
+- Per-session metrics (latency, audio chunks, interruptions)
 
 ### Caching
 
@@ -71,11 +81,19 @@ Base URL: `http://localhost:8082`
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/api/v1/invoke` | POST | Unified inference endpoint |
-| `/api/v1/invoke/v2` | POST | Extended invoke route |
+| `/api/v1/invoke/v2` | POST | Extended invoke with role/capability routing |
 | `/api/v1/models` | GET | List available LLM models |
 | `/api/v1/cache/stats` | GET | Cache statistics |
 | `/api/v1/cache/invalidate/{provider}/{model}` | POST | Invalidate cache by provider/model |
 | `/api/v1/cache/clear` | POST | Clear all cache entries |
+
+### Voice & Realtime
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/realtime/sessions` | POST | Create realtime voice session |
+| `/realtime/ws/{session_id}` | WS | WebSocket bidirectional voice proxy |
+| `/realtime/sessions/{session_id}/interrupt` | POST | Send barge-in / cancel response |
 
 ### Training
 
@@ -121,6 +139,56 @@ curl -X POST http://localhost:8082/api/v1/models/inference/ml/prediction/models/
     "include_history": false
   }'
 ```
+
+## Intelligent Model Routing
+
+The invoke endpoint supports role-based and capability-based model selection with optional cost constraints:
+
+```bash
+# Role-based resolution — automatically selects best model for the role
+curl -X POST http://localhost:8082/api/v1/invoke/v2 \
+  -H "Content-Type: application/json" \
+  -d '{
+    "role": "reasoning",
+    "messages": [{"role": "user", "content": "Solve this logic puzzle"}],
+    "preferred_max_cost_per_token": 0.00005
+  }'
+```
+
+**Role defaults:**
+
+| Role | Default Model | Provider |
+|------|--------------|----------|
+| `reasoning` | deepseek-reasoner | yyds |
+| `response` | gemini-2.5-flash-lite | openrouter |
+| `coding` | minimax-m2.5 | openrouter |
+| `default` | gpt-5-nano | openai |
+
+Resolution priority: explicit model/provider → role lookup → capability filter → service type defaults.
+
+## Voice Session Example
+
+```bash
+# 1) Create a realtime voice session
+curl -X POST http://localhost:8082/realtime/sessions \
+  -H "Content-Type: application/json" \
+  -H "x-user-id: user-123" \
+  -d '{"model": "gpt-4o-realtime-preview", "voice": "alloy"}'
+
+# Response: { "session_id": "...", "websocket_url": "ws://...", "expires_at": "..." }
+
+# 2) Connect via WebSocket for bidirectional audio streaming
+# 3) Interrupt (barge-in) during a response
+curl -X POST http://localhost:8082/realtime/sessions/{session_id}/interrupt
+```
+
+**Privacy modes:**
+
+| Mode | Audio Retention | Transcript Retention | Metadata Retention |
+|------|----------------|---------------------|--------------------|
+| `STRICT` | 0 days | 0 days | 7 days |
+| `STANDARD` | 0 days | 30 days | 90 days |
+| `DEBUG` | 365 days | 365 days | 365 days |
 
 ## Documentation
 
