@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
+import { surfaces } from '../lib/surfaces'
 
 interface ApiPlaygroundProps {
   endpoint: string
@@ -15,7 +16,7 @@ export function ApiPlayground({
   method = 'POST',
   defaultBody = '{\n  "message": "Hello, world!"\n}',
   defaultHeaders = { 'Content-Type': 'application/json' },
-  baseUrl = 'https://api.isa.io'
+  baseUrl = surfaces.api
 }: ApiPlaygroundProps) {
   const [body, setBody] = useState(defaultBody)
   const [response, setResponse] = useState<string | null>(null)
@@ -216,7 +217,7 @@ export function DemoPlayground({
         <span className={`px-2 py-1 text-xs font-bold text-white rounded ${methodColors[method]}`}>
           {method}
         </span>
-        <code className="text-sm text-muted">https://api.isa.io{endpoint}</code>
+        <code className="text-sm text-muted">{surfaces.api}{endpoint}</code>
         <span className="ml-auto text-xs px-2 py-1 bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400 rounded">
           Demo Mode
         </span>

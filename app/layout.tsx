@@ -5,6 +5,7 @@ import 'nextra-theme-docs/style.css'
 import './globals.css'
 import { AISearch } from '../components/AISearch'
 import { ThemeToggle } from '../components/ThemeToggle'
+import { community, getDocsRepositoryBase } from '../lib/surfaces'
 
 export const metadata = {
   title: {
@@ -47,7 +48,7 @@ const FooterContent = () => (
       </div>
       <div className="flex items-center gap-6">
         <a
-          href="https://github.com/xenoISA"
+          href={community.github}
           target="_blank"
           rel="noopener noreferrer"
           className="text-sm text-muted hover:text-foreground"
@@ -55,7 +56,7 @@ const FooterContent = () => (
           GitHub
         </a>
         <a
-          href="https://discord.gg/isa"
+          href={community.discord}
           target="_blank"
           rel="noopener noreferrer"
           className="text-sm text-muted hover:text-foreground"
@@ -63,7 +64,7 @@ const FooterContent = () => (
           Discord
         </a>
         <a
-          href="https://twitter.com/isA_platform"
+          href={community.twitter}
           target="_blank"
           rel="noopener noreferrer"
           className="text-sm text-muted hover:text-foreground"
@@ -90,14 +91,14 @@ export default async function RootLayout({
           navbar={
             <Navbar
               logo={<Logo />}
-              projectLink="https://github.com/xenoISA"
+              projectLink={community.github}
             >
               <ThemeToggle />
             </Navbar>
           }
           footer={<Footer><FooterContent /></Footer>}
           pageMap={pageMap}
-          docsRepositoryBase="https://github.com/xenoISA/isA_Docs/tree/main/content"
+          docsRepositoryBase={getDocsRepositoryBase()}
           editLink="Edit this page on GitHub"
           search={<AISearch />}
         >

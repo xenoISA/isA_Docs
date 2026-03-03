@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
+import { surfaces } from '../lib/surfaces'
 
 type StatusType = 'operational' | 'degraded' | 'outage' | 'maintenance' | 'loading'
 
@@ -80,7 +81,7 @@ export function StatusBadge({ statusUrl, service }: StatusBadgeProps) {
 
   return (
     <a
-      href={statusUrl || 'https://status.isa.io'}
+      href={statusUrl || surfaces.status}
       target="_blank"
       rel="noopener noreferrer"
       className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium ${config.bgColor} ${config.color} hover:opacity-80 transition-opacity`}

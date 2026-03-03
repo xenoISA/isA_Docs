@@ -1,6 +1,16 @@
 @import "tailwindcss";
 
-/* isA Platform Shared Design Tokens */
+/*
+ * isA Platform Shared Design Tokens
+ *
+ * Token names and values are aligned with @isa/theme from isA_App_SDK.
+ * When @isa/theme is published as an installable package, these manual
+ * definitions can be replaced with:
+ *
+ *   @import "@isa/theme/css/tokens.css";
+ *
+ * @see https://github.com/xenoISA/isA_App_SDK/tree/main/packages/theme
+ */
 :root {
   /* Primary brand colors - Blue */
   --color-primary-50: #eff6ff;
