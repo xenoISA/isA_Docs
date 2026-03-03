@@ -1,0 +1,121 @@
+# isA Console
+
+Web-based management dashboard for agents, models, MCP tools, and platform administration.
+
+## Overview
+
+isA Console is a Next.js 16 application (React 19) that provides a unified control center for the isA platform. It integrates with App SDK packages (`@isa/core`, `@isa/hooks`, `@isa/theme`, `@isa/ui-web`) and proxies 8 backend services.
+
+## Quick Start
+
+```bash
+pnpm install
+cp .env.example .env.local
+pnpm run dev
+# Open http://localhost:5173
+```
+
+## Features
+
+### Developer Tools
+
+| Section | Description |
+|---------|-------------|
+| **Playground** | Interactive agent and MCP testing with chat, config panels, code export |
+| **MCP Platform** | Browse servers, tools, skills, prompts, and resources |
+| **Model Platform** | Catalog, deployments, training, evaluation, analytics, prediction |
+| **Agents** | Create, manage, and configure agents with templates and multi-agent teams |
+
+### Account Management
+
+| Section | Description |
+|---------|-------------|
+| **API Keys** | Generate and manage API credentials |
+| **Usage** | Monitor token usage, request counts, and costs |
+| **Subscription** | Billing and plan management |
+| **Settings** | Account preferences and theme |
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────┐
+│                isA Console (Next.js 16)          │
+│  ┌──────────┐ ┌──────────┐ ┌──────────────────┐│
+│  │Playground│ │MCP Tools │ │Model Platform    ││
+│  │Agent Chat│ │Servers   │ │Deploy • Train    ││
+│  │Config    │ │Skills    │ │Evaluate • Analyze││
+│  └──────────┘ └──────────┘ └──────────────────┘│
+│  ┌──────────┐ ┌──────────┐ ┌──────────────────┐│
+│  │ Agents   │ │ API Keys │ │ Usage & Billing  ││
+│  │Create    │ │ Manage   │ │ Monitor • Export  ││
+│  │Templates │ │ Generate │ │ Subscription     ││
+│  └──────────┘ └──────────┘ └──────────────────┘│
+└──────────────────────┬──────────────────────────┘
+                       ↓ Next.js API rewrites
+┌─────────────────────────────────────────────────┐
+│              Backend Services                    │
+│  Auth:8201 • Session:8203 • Model:8082          │
+│  MCP:8081  • Agent:8080   • Billing:8216        │
+│  Org:8212  • Payment:8207 • Vibe:8240           │
+└─────────────────────────────────────────────────┘
+```
+
+## Pages
+
+```
+/                          Landing page
+/login, /register          Authentication
+/dashboard                 Overview (stats, requests, costs)
+/dashboard/playground      Agent & MCP testing interface
+/dashboard/mcp/*           MCP servers, tools, skills, prompts, resources
+/dashboard/models/*        Catalog, deployments, training, evaluation, analytics
+/dashboard/agents/*        Agent management, creation, templates, multi-agent
+/dashboard/api-keys        API key management
+/dashboard/usage           Usage analytics
+/dashboard/subscription    Billing & plans
+/dashboard/settings        Account settings
+```
+
+## Tech Stack
+
+| Tool | Purpose |
+|------|---------|
+| Next.js 16 | App Router framework |
+| React 19 | UI library |
+| TypeScript 5 | Language (strict mode) |
+| Tailwind CSS 4 | Styling |
+| SWR 2.4 | Data fetching & caching |
+| Recharts 3.7 | Analytics charts |
+| @isa/core | Platform service clients |
+| @isa/hooks | React hooks |
+| @isa/ui-web | Component library |
+| @isa/theme | Design tokens |
+
+## Environment Variables
+
+```bash
+NEXT_PUBLIC_APP_URL=http://localhost:5173
+
+# Backend service URLs (proxied via Next.js rewrites)
+AUTH_SERVICE_URL=http://localhost:8201
+SESSION_SERVICE_URL=http://localhost:8203
+ORGANIZATION_SERVICE_URL=http://localhost:8212
+MODEL_SERVICE_URL=http://localhost:8082
+MCP_SERVICE_URL=http://localhost:8081
+AGENT_SERVICE_URL=http://localhost:8080
+BILLING_SERVICE_URL=http://localhost:8216
+PAYMENT_SERVICE_URL=http://localhost:8207
+
+# Development
+NEXT_PUBLIC_SKIP_AUTH=true    # Skip auth for local dev
+```
+
+## Development
+
+```bash
+pnpm run dev       # Dev server (port 5173, webpack)
+pnpm run build     # Production build
+pnpm run lint      # ESLint
+```
+
+SDK packages are linked from the `isA_App_SDK` monorepo via path aliases in `next.config.ts`.

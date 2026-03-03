@@ -1,0 +1,131 @@
+# isA Chain
+
+Full-stack blockchain ecosystem with Rust core, smart contracts, DeFi protocols, and AI integration.
+
+## Overview
+
+isA Chain is a comprehensive blockchain platform built in Rust (core) with TypeScript/Solidity for smart contracts and applications. It includes a custom Proof-of-Stake blockchain, HD wallets, DeFi protocols, NFT marketplace, and privacy layer.
+
+## Quick Start
+
+```bash
+# Install dependencies
+npm install
+
+# Build blockchain core (Rust)
+cargo build --release --manifest-path=core/blockchain/Cargo.toml
+
+# Start all services
+./scripts/start-services.sh start
+
+# Deploy contracts to testnet
+npm run deploy:testnet
+```
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────┐
+│              Applications                        │
+│    Web UI (Next.js) • Wallet • Explorer          │
+└──────────────────────┬──────────────────────────┘
+                       ↓
+┌─────────────────────────────────────────────────┐
+│           Smart Contracts Layer                   │
+│  ┌──────────────────┐  ┌──────────────────┐     │
+│  │ Solidity (EVM)   │  │ Rust (Native)    │     │
+│  │ DeFi • NFT • Gov │  │ High-performance │     │
+│  └──────────────────┘  └──────────────────┘     │
+└──────────────────────┬──────────────────────────┘
+                       ↓
+┌─────────────────────────────────────────────────┐
+│           Core Blockchain (Rust)                  │
+│  Consensus • Networking • Storage • Mempool      │
+│  PoS Validators • Merkle Patricia Trie • libp2p  │
+└──────────────────────┬──────────────────────────┘
+                       ↓
+┌─────────────────────────────────────────────────┐
+│           Infrastructure                         │
+│  RocksDB • libp2p • Tokio • ZK Proofs           │
+└─────────────────────────────────────────────────┘
+```
+
+## Core Modules
+
+### Blockchain Core (Rust)
+
+| Module | Purpose |
+|--------|---------|
+| `blockchain.rs` | Core chain logic |
+| `block.rs` | Block creation and validation |
+| `transaction.rs` | Transaction handling |
+| `consensus.rs` | Proof-of-Stake consensus |
+| `network.rs` | P2P networking (libp2p, gossip) |
+| `storage.rs` | State and block storage (RocksDB) |
+| `mempool.rs` | Transaction pool management |
+| `validator.rs` | Validator management and slashing |
+| `state.rs` | Merkle Patricia Trie state |
+
+### Wallet
+
+- HD wallets with BIP32/BIP39/BIP44 standards
+- Hardware wallet support (Ledger, Trezor)
+- Social recovery mechanisms
+- Secure key storage with AES-GCM encryption
+
+### DeFi Protocols
+
+| Protocol | Features |
+|----------|----------|
+| **DEX** | Decentralized exchange with optimal routing |
+| **Staking** | Liquid staking with delegation |
+| **Lending** | Lending protocols with collateral |
+| **Yield Farming** | Yield optimization strategies |
+
+### Additional Modules
+
+| Module | Purpose |
+|--------|---------|
+| **NFT** | Marketplace with metadata management |
+| **Privacy** | ZK-SNARKs for anonymous transactions |
+| **Oracle** | Oracle network for external data |
+| **Governance** | On-chain proposal voting |
+| **AI Integration** | MCP bridges for AI agent access |
+
+## Cryptography
+
+| Algorithm | Use Case |
+|-----------|----------|
+| SHA-256, SHA-3, BLAKE3 | Block and transaction hashing |
+| secp256k1, Ed25519 | Digital signatures |
+| AES-GCM | Wallet encryption |
+| ZK-SNARKs (ark-*) | Privacy proofs |
+
+## Consensus
+
+Proof-of-Stake with:
+- Validator delegation and staking rewards
+- Slashing for malicious behavior
+- Byzantine fault tolerance
+- Finality guarantees
+
+## Tech Stack
+
+| Tool | Purpose |
+|------|---------|
+| Rust + Tokio | Core blockchain (async runtime) |
+| libp2p | P2P networking and peer discovery |
+| RocksDB / sled | State and block storage |
+| Solidity | EVM-compatible smart contracts |
+| Next.js + TypeScript | Web application layer |
+| ark-* libraries | Zero-knowledge proofs |
+
+## Development
+
+```bash
+npm run dev:all              # Run all services
+cargo test                   # Test blockchain core
+npm run build:contracts      # Compile smart contracts
+npm run test:contracts       # Test contracts
+docker-compose up -d         # Start infrastructure
+```

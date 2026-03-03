@@ -1,0 +1,195 @@
+# isA App SDK
+
+Universal TypeScript SDK for building web, mobile, and IoT applications on the isA platform.
+
+## Overview
+
+isA App SDK is a modular pnpm monorepo providing 6 packages that work independently or together:
+
+| Package | Purpose |
+|---------|---------|
+| **@isa/core** | 21 service clients via unified `IsAClient` |
+| **@isa/transport** | Multi-protocol support (HTTP, MQTT, WebSocket, SSE) |
+| **@isa/hooks** | 40+ React hooks for Web and React Native |
+| **@isa/theme** | Design tokens and theming system |
+| **@isa/ui-web** | 28 React Web UI components |
+| **@isa/ui-native** | React Native UI components |
+
+## Quick Start
+
+```bash
+# Install the core SDK
+pnpm add @isa/core
+
+# Configure
+export GATEWAY_URL=http://localhost:80
+```
+
+```typescript
+import { IsAClient } from '@isa/core'
+
+const client = new IsAClient()
+
+// Authentication
+await client.auth.login({ email, password })
+
+// Use any of 21 service clients
+const devices = await client.device.list()
+const agents = await client.agent.chat("Hello!")
+const files = await client.storage.upload(file)
+```
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────┐
+│           Applications Layer                     │
+│     Web App  •  Mobile App  •  IoT  •  Server   │
+└──────────────────────┬──────────────────────────┘
+                       ↓
+┌─────────────────────────────────────────────────┐
+│              isA App SDK                         │
+│  ┌───────────────────────────────────────────┐  │
+│  │ @isa/core (21 service clients)            │  │
+│  ├───────────────────────────────────────────┤  │
+│  │ @isa/hooks  │ @isa/theme  │ @isa/ui-*    │  │
+│  ├───────────────────────────────────────────┤  │
+│  │ @isa/transport (HTTP, MQTT, WS, SSE)     │  │
+│  └───────────────────────────────────────────┘  │
+└──────────────────────┬──────────────────────────┘
+                       ↓
+┌─────────────────────────────────────────────────┐
+│          API Gateway (Port 80)                   │
+│          isA Microservices (8201-8250)           │
+└─────────────────────────────────────────────────┘
+```
+
+## Packages
+
+### @isa/core
+
+Unified client with 21 service integrations:
+
+| Category | Services |
+|----------|----------|
+| **Auth & Identity** | auth, account, session, authorization |
+| **AI & Agents** | agent, model, mcp |
+| **Commerce** | product, order, payment, wallet, billing |
+| **Storage & Media** | storage, album, media |
+| **Organization** | organization, invitation |
+| **IoT** | device, ota, telemetry |
+| **Other** | notification, calendar, task, weather, vault, memory |
+
+```typescript
+import { IsAClient, isaClient } from '@isa/core'
+
+// Singleton (recommended)
+const response = await isaClient.model.invoke({
+  model: "gpt-4o-mini",
+  messages: [{ role: "user", content: "Hello" }]
+})
+
+// Or create a custom instance
+const client = new IsAClient({ baseUrl: "https://api.example.com" })
+```
+
+### @isa/transport
+
+Multi-protocol communication layer:
+
+```typescript
+import { HttpClient, MQTTClient, WebSocketClient, SSEClient } from '@isa/transport'
+
+// HTTP (default)
+const http = new HttpClient({ baseUrl: "http://localhost:80" })
+
+// MQTT for IoT real-time messaging
+const mqtt = new MQTTClient({ brokerUrl: "mqtt://localhost:1883" })
+await mqtt.subscribe("devices/+/status", (msg) => console.log(msg))
+
+// WebSocket for bidirectional streaming
+const ws = new WebSocketClient({ url: "ws://localhost:8080" })
+
+// SSE for server-sent events
+const sse = new SSEClient({ url: "http://localhost:8082/stream" })
+```
+
+### @isa/hooks
+
+React hooks for common patterns:
+
+```typescript
+import { useAuth, useChat, useIsAClient } from '@isa/hooks'
+
+function App() {
+  const { user, login, logout } = useAuth()
+  const { messages, send } = useChat()
+  const client = useIsAClient()
+
+  return <ChatInterface messages={messages} onSend={send} />
+}
+```
+
+### @isa/ui-web
+
+28 React components for agent and platform UIs:
+
+- **Agent**: AgentCard, AgentEditor, ArtifactViewer
+- **Chat**: ChatInput, ChatMessage, MarkdownRenderer
+- **Code**: CodeSandbox, PythonREPL (Sandpack + CodeMirror)
+- **Model**: ModelCard, ModelSelector
+- **Tools**: ToolBrowser, ToolCard, ToolDetail
+- **Voice**: VoiceUI with visualization
+- **HIL**: HILModal for human-in-the-loop approvals
+
+### @isa/theme
+
+Design token system:
+
+```typescript
+import { ThemeProvider } from '@isa/theme'
+import { colors } from '@isa/theme/colors'
+import { spacing } from '@isa/theme/spacing'
+import { typography } from '@isa/theme/typography'
+```
+
+## Installation
+
+**Prerequisites:** Node.js 18+, pnpm 8+
+
+```bash
+# Individual packages
+pnpm add @isa/core
+pnpm add @isa/hooks @isa/theme        # React apps
+pnpm add @isa/ui-web                   # Web components
+pnpm add @isa/ui-native               # React Native
+
+# Development (monorepo)
+git clone https://github.com/xenoISA/isA_App_SDK
+pnpm install && pnpm build && pnpm dev
+```
+
+## Environment Variables
+
+```bash
+GATEWAY_URL=http://localhost:80        # API gateway URL
+# Or individual components:
+GATEWAY_HOST=localhost
+GATEWAY_PORT=80
+GATEWAY_PROTOCOL=http
+
+# Optional protocols
+MQTT_BROKER_URL=mqtt://localhost:1883
+WS_URL=ws://localhost:8080
+```
+
+## Tech Stack
+
+| Tool | Purpose |
+|------|---------|
+| TypeScript 5.3 | Language (strict mode) |
+| pnpm 8.15+ | Package manager |
+| tsup | Bundler (CJS + ESM output) |
+| Vitest | Unit/integration tests |
+| Playwright | E2E tests |
+| Tailwind CSS | UI styling (ui-web) |
