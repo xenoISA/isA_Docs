@@ -1,0 +1,120 @@
+# isA Trade
+
+Multi-agent trading system with 4 specialized AI agents for automated market analysis and trade execution.
+
+## Overview
+
+isA Trade is a coordinated multi-agent architecture where specialized agents collaborate to make trading decisions. Each agent runs as an independent FastAPI service communicating via NATS messaging.
+
+| Agent | Port | Role |
+|-------|------|------|
+| **Orchestrator** | 8080 | Central CIO — coordinates agents, makes final decisions |
+| **Research Agent** | 8081 | Fundamental analysis, earnings, news sentiment |
+| **Technical Agent** | 8082 | Chart patterns, indicators, signal generation |
+| **Risk Agent** | 8083 | Portfolio monitoring, position validation, **veto power** |
+
+## Quick Start
+
+```bash
+# Install
+python -m venv .venv && source .venv/bin/activate
+pip install -e ".[all]"
+
+# Start infrastructure
+docker-compose up -d  # PostgreSQL, Redis, NATS
+
+# Start agents (each in a separate terminal)
+uvicorn src.orchestrator.main:app --port 8080 --reload
+uvicorn src.research_agent.main:app --port 8081 --reload
+uvicorn src.technical_agent.main:app --port 8082 --reload
+uvicorn src.risk_agent.main:app --port 8083 --reload
+```
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────┐
+│              Market Data Feeds                   │
+│    yfinance • Finnhub • FRED • CCXT             │
+└──────────────────────┬──────────────────────────┘
+                       ↓
+┌─────────────────────────────────────────────────┐
+│           Orchestrator (Port 8080)               │
+│       Coordinates analysis, makes decisions      │
+└───────┬──────────────┬──────────────┬───────────┘
+        ↓              ↓              ↓
+┌──────────────┐ ┌───────────┐ ┌──────────────┐
+│  Research    │ │ Technical │ │    Risk       │
+│  Agent :8081 │ │ Agent:8082│ │  Agent :8083  │
+│  Fundamental │ │ Indicators│ │  VETO POWER   │
+│  Sentiment   │ │ Patterns  │ │  Portfolio    │
+│  Earnings    │ │ Signals   │ │  Limits       │
+└──────────────┘ └───────────┘ └──────────────┘
+        │              │              │
+        └──────────────┼──────────────┘
+                       ↓
+┌─────────────────────────────────────────────────┐
+│              Infrastructure                      │
+│  PostgreSQL (journal) • Redis (cache) • NATS    │
+└─────────────────────────────────────────────────┘
+```
+
+## Risk Management
+
+The Risk Agent enforces hard limits that **cannot be overridden**:
+
+| Rule | Limit |
+|------|-------|
+| Max position risk | 2% of portfolio |
+| Max sector concentration | 25% |
+| Daily loss circuit breaker | 3% |
+| Max open positions | 15 |
+| Drawdown circuit breaker | 10% |
+| Max correlation with existing | 0.8 |
+
+## Agent Capabilities
+
+### Research Agent
+
+- Financial statement analysis
+- Earnings reports and guidance
+- News sentiment scoring
+- Sector and macro analysis
+
+### Technical Agent
+
+- Chart pattern recognition
+- Technical indicators (RSI, MACD, Bollinger, etc.)
+- Signal generation and regime detection
+- Volume and momentum analysis
+
+### Orchestrator
+
+- Multi-agent coordination and pipeline routing
+- Decision fusion from all agent signals
+- Trade journal and audit logging
+- Session management
+
+## Tech Stack
+
+| Tool | Purpose |
+|------|---------|
+| Python 3.11+ | Language |
+| FastAPI | Agent HTTP services |
+| isA Agent SDK | Agent framework |
+| PostgreSQL | Trade journal, portfolio state |
+| Redis | Real-time cache, sessions |
+| NATS | Inter-agent messaging |
+| Pandas, NumPy, SciPy | Data analysis |
+| yfinance, Finnhub, FRED | Market data |
+| CCXT | Crypto exchange connectivity |
+
+## Data Sources
+
+| Source | Data |
+|--------|------|
+| yfinance | Stock prices, fundamentals |
+| Finnhub | Real-time quotes, news |
+| FRED | Macro economic data |
+| CCXT | Crypto exchange data |
+| Alpaca | Broker integration (optional) |

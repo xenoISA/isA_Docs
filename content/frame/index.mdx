@@ -1,0 +1,138 @@
+# isA Frame (EmoFrame)
+
+AI-driven smart photo frame system with display, mobile control, and shared SDK.
+
+## Overview
+
+EmoFrame is a family-oriented smart display system built with React Native and Expo, consisting of three coordinated applications:
+
+| App | Purpose | Platform |
+|-----|---------|----------|
+| **emoframe-display** | Smart photo frame UI with interactive bubbles | React Native + Expo |
+| **emoframe-mobile** | Remote control app for device management | React Native + Expo |
+| **emoframe-shared** | Shared SDK with 12 services and communication layer | TypeScript |
+
+## Quick Start
+
+```bash
+# Install and build shared library
+npm install
+npm run build:shared
+
+# Run display app
+cd emoframe-display
+npm install && npm start
+
+# Run mobile app (separate terminal)
+cd emoframe-mobile
+npm install && npm start
+```
+
+## Architecture
+
+```
+┌───────────────────────┐  ┌───────────────────────┐
+│   emoframe-display    │  │   emoframe-mobile      │
+│   (Smart Frame UI)    │  │   (Control App)        │
+└───────────┬───────────┘  └───────────┬───────────┘
+            │                          │
+            └──────────┬───────────────┘
+                       ↓
+┌─────────────────────────────────────────────────┐
+│             emoframe-shared SDK                  │
+│  ┌─────────────────────────────────────────┐    │
+│  │ 12 Services (Auth, Device, Chat, ...)   │    │
+│  ├─────────────────────────────────────────┤    │
+│  │ HTTP  •  MQTT (real-time)  •  Images    │    │
+│  └─────────────────────────────────────────┘    │
+└──────────────────────┬──────────────────────────┘
+                       ↓
+┌─────────────────────────────────────────────────┐
+│         isA Platform Gateway                     │
+│    Agent • User • Device • Storage APIs          │
+└─────────────────────────────────────────────────┘
+```
+
+## Display Features
+
+The display app provides a 3-page swipeable interface:
+
+| View | Features |
+|------|----------|
+| **MainView** | Time, weather, interactive message bubbles |
+| **CalendarView** | Events and scheduling |
+| **GalleryView** | Family photo albums and memory timeline |
+
+Key components:
+- **Interactive Bubbles** — draggable message bubbles with physics simulation
+- **Photo Gallery** — family albums with full-screen viewer and metadata
+- **Memory Calendar** — timeline-based photo memory browsing
+- **Weather Widget** — glassmorphism weather display
+- **Notification System** — toast alerts and managers
+
+## Device Pairing
+
+QR-code-based pairing flow:
+
+```
+Device generates QR → Mobile scans → Auth validates token → Device paired to family
+```
+
+```
+EMOFRAME:deviceId:pairingToken
+```
+
+The pairing process registers the device with the auth service, links it to the user's family organization, and stores configuration in AsyncStorage.
+
+## Shared Services
+
+| Service | Purpose |
+|---------|---------|
+| `AuthService` | Token management and user authentication |
+| `DeviceService` | Device registration, pairing, status |
+| `ChatService` | Agent chat integration |
+| `StorageService` | File and photo asset storage |
+| `WeatherService` | Weather data and widget formatting |
+| `NotificationService` | Message delivery |
+| `OTAService` | Firmware over-the-air updates |
+| `TelemetryService` | Usage analytics |
+| `OrganizationService` | Family/group management |
+| `TaskService` | Task and reminder management |
+| `UserService` | User profiles |
+| `ImageProcessingService` | Photo resizing and filtering |
+
+## Communication
+
+| Protocol | Use Case |
+|----------|----------|
+| **HTTP** | REST APIs via `@isa/transport` |
+| **MQTT** | Real-time messages and device status |
+| **Image Client** | Optimized photo fetching |
+
+## Tech Stack
+
+| Tool | Version |
+|------|---------|
+| React Native | 0.81 |
+| Expo | ~54.0 |
+| TypeScript | ~5.9 |
+| React | 19.1 |
+| @isa/core | Linked (monorepo) |
+| @isa/ui-native | Linked (monorepo) |
+
+## Build & Deploy
+
+```bash
+# Development
+npm start                          # Expo dev server
+npm run android                    # Android native
+npm run ios                        # iOS (macOS only)
+npm run web                        # Web preview
+
+# Production (EAS)
+npm run build:android:production
+npm run build:ios:production
+
+# Verify before merge
+npm run verify                     # build + typecheck + test + production check
+```
