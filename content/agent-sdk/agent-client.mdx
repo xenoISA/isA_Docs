@@ -58,7 +58,7 @@ async with ISAAgentClient() as client:
 ```python
 options = ISAAgentOptions(
     model="deepseek-reasoner",
-    allowed_tools=["Read", "Edit", "Bash"],
+    allowed_tools=["read_file", "edit_file", "bash_execute"],
     max_iterations=20
 )
 

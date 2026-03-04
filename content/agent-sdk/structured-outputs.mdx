@@ -189,7 +189,7 @@ class TodoReport(BaseModel):
 async for msg in query(
     prompt="Find all TODO comments in this codebase and identify who added them",
     options=ISAAgentOptions(
-        allowed_tools=["Grep", "Bash", "Read"],
+        allowed_tools=["grep_search", "bash_execute", "read_file"],
         output_format=OutputFormat.from_pydantic(TodoReport)
     )
 ):
