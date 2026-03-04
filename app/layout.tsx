@@ -12,7 +12,7 @@ export const metadata = {
     default: 'isA Platform Documentation',
     template: '%s | isA Docs'
   },
-  description: 'Build, deploy, and scale intelligent AI agents with the complete isA platform. Agent SDK, 89+ MCP tools, Model gateway, and production-ready infrastructure.',
+  description: 'Build, deploy, and scale intelligent AI agents with the complete isA platform. Agent SDK, 190+ MCP tools, Model gateway, and production-ready infrastructure.',
   keywords: ['AI agents', 'LLM', 'Agent SDK', 'MCP', 'Kubernetes', 'AI platform'],
   authors: [{ name: 'isA Platform' }],
   openGraph: {
