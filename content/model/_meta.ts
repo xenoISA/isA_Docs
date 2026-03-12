@@ -5,5 +5,6 @@ export default {
   'tool-calling': 'Tool Calling',
   providers: 'Providers',
   caching: 'Caching',
+  training: 'Fine-Tuning & Training',
   'api-reference': 'API Reference'
 }

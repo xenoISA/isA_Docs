@@ -1,0 +1,490 @@
+# Fine-Tuning & Training
+
+Train custom LoRA adapters on your data and deploy fine-tuned models to Ollama with one command.
+
+## Overview
+
+isA Model provides a complete fine-tuning pipeline built on `peft` and `trl`:
+
+1. **Upload** a JSONL dataset via the REST API
+2. **Launch** a LoRA SFT training job on a base model
+3. **Track** job progress and training metrics
+4. **Register** the resulting adapter checkpoint with versioning
+5. **Deploy** the fine-tuned model to Ollama for local inference
+
+```
+Dataset → LoRA SFT Training → Adapter Checkpoint → Merge → GGUF → Ollama
+```
+
+## Prerequisites
+
+```bash
+# Training dependencies (GPU required for training)
+pip install isa_model[local]
+
+# Additional fine-tuning packages
+pip install peft trl datasets
+
+# For Ollama deployment
+# Ollama must be running: https://ollama.ai
+```
+
+## Dataset Management
+
+Training datasets use **JSONL format** with instruction/input/output fields. The API validates records on upload and rejects malformed data.
+
+### Dataset Format
+
+Each line is a JSON object with the following fields:
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `instruction` | Yes | The task instruction or prompt |
+| `input` | No | Optional context or input text |
+| `output` | Yes | The expected model response |
+
+Example dataset (`train.jsonl`):
+
+```json
+{"instruction": "Summarize the following text", "input": "The quick brown fox jumps over the lazy dog.", "output": "A fox jumps over a dog."}
+{"instruction": "Translate to French", "input": "Hello, how are you?", "output": "Bonjour, comment allez-vous ?"}
+{"instruction": "Write a haiku about coding", "input": "", "output": "Lines of code compile\nBugs emerge from the shadows\nTests bring the green light"}
+```
+
+### Upload a Dataset
+
+```bash
+curl -X POST http://localhost:8082/api/v1/training/datasets \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "my-training-data.jsonl",
+    "content": "{\"instruction\": \"Summarize\", \"input\": \"Long text here...\", \"output\": \"Short summary.\"}\n{\"instruction\": \"Classify sentiment\", \"input\": \"I love this product!\", \"output\": \"positive\"}"
+  }'
+```
+
+Response:
+
+```json
+{
+  "dataset_id": "a1b2c3d4-...",
+  "name": "my-training-data.jsonl",
+  "format": "jsonl",
+  "num_records": 2,
+  "size_bytes": 195,
+  "created_at": "2026-03-01T12:00:00+00:00"
+}
+```
+
+### List Datasets
+
+```bash
+curl http://localhost:8082/api/v1/training/datasets
+```
+
+### Get Dataset Details
+
+```bash
+curl http://localhost:8082/api/v1/training/datasets/{dataset_id}
+```
+
+### Delete a Dataset
+
+```bash
+curl -X DELETE http://localhost:8082/api/v1/training/datasets/{dataset_id}
+```
+
+## LoRA SFT Training
+
+The training pipeline uses **LoRA** (Low-Rank Adaptation) with **SFT** (Supervised Fine-Tuning) via the `peft` and `trl` libraries. LoRA trains a small adapter on top of a frozen base model, keeping memory requirements low while achieving strong task-specific performance.
+
+### How It Works
+
+1. Load a base model from HuggingFace (e.g., `Qwen/Qwen2.5-Coder-1.5B-Instruct`)
+2. Attach LoRA adapters to attention projection layers (`q_proj`, `k_proj`, `v_proj`, `o_proj`)
+3. Train only the adapter weights using SFT on your dataset
+4. Save the adapter separately (typically 10-50 MB vs. multi-GB base model)
+
+### Default Configuration
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `base_model` | `Qwen/Qwen2.5-Coder-1.5B-Instruct` | HuggingFace model path |
+| `method` | `lora` | Fine-tuning method |
+| `lora_r` | `16` | LoRA rank (higher = more capacity, more memory) |
+| `lora_alpha` | `32` | LoRA scaling factor |
+| `lora_dropout` | `0.05` | Dropout for regularization |
+| `target_modules` | `q_proj, k_proj, v_proj, o_proj` | Attention layers to adapt |
+| `learning_rate` | `2e-4` | Training learning rate |
+| `num_epochs` | `3` | Number of training epochs |
+| `batch_size` | `4` | Per-device batch size |
+| `max_seq_length` | `1024` | Maximum sequence length |
+
+### Launch a Fine-Tuning Job
+
+```bash
+curl -X POST http://localhost:8082/api/v1/training/finetune \
+  -H "Content-Type: application/json" \
+  -d '{
+    "dataset_id": "a1b2c3d4-...",
+    "base_model": "Qwen/Qwen2.5-Coder-1.5B-Instruct",
+    "method": "lora",
+    "hyperparams": {
+      "lora_r": 16,
+      "lora_alpha": 32,
+      "learning_rate": 2e-4,
+      "num_epochs": 3,
+      "batch_size": 4,
+      "max_seq_length": 1024
+    }
+  }'
+```
+
+Response:
+
+```json
+{
+  "job_id": "e5f6a7b8-...",
+  "dataset_id": "a1b2c3d4-...",
+  "base_model": "Qwen/Qwen2.5-Coder-1.5B-Instruct",
+  "method": "lora",
+  "status": "queued",
+  "hyperparams": { "lora_r": 16, "lora_alpha": 32, "..." : "..." },
+  "progress": 0.0,
+  "metrics": {},
+  "error": null,
+  "created_at": "2026-03-01T12:05:00+00:00",
+  "completed_at": null,
+  "adapter_path": null
+}
+```
+
+### Monitor Job Progress
+
+Jobs transition through statuses: `queued` -> `running` -> `completed` (or `failed`).
+
+```bash
+# Get a specific job
+curl http://localhost:8082/api/v1/training/finetune/{job_id}
+
+# List all jobs
+curl http://localhost:8082/api/v1/training/finetune
+```
+
+A completed job includes training metrics:
+
+```json
+{
+  "job_id": "e5f6a7b8-...",
+  "status": "completed",
+  "progress": 1.0,
+  "metrics": {
+    "train_loss": 0.42,
+    "train_runtime": 1834.5,
+    "train_samples_per_second": 12.3
+  },
+  "adapter_path": "output/lora-sft/final_adapter",
+  "completed_at": "2026-03-01T12:35:00+00:00"
+}
+```
+
+### Using the Algorithm Directly
+
+For programmatic access without the REST API:
+
+```python
+from isa_model.training.lightning.algorithms.lora_sft_algorithm import LoRASFTAlgorithm
+
+algo = LoRASFTAlgorithm(
+    model_path="meta-llama/Llama-2-7b-hf",
+    lora_r=16,
+    lora_alpha=32,
+    num_epochs=3,
+    learning_rate=2e-4,
+)
+
+result = algo.create(dataset_path="train.jsonl")
+
+print(f"Adapter saved to: {result.adapter_path}")
+print(f"Training loss: {result.metrics['train_loss']}")
+print(f"Samples: {result.num_samples}, Epochs: {result.num_epochs}")
+```
+
+## Checkpoint Registry
+
+Every completed fine-tuning job produces a LoRA adapter that can be registered in the checkpoint registry. Adapters are versioned automatically and addressable via a `model_id` format.
+
+### Model ID Format
+
+```
+base-model:adapter-name        # resolves to latest version
+base-model:adapter-name:vN     # resolves to specific version
+```
+
+Examples:
+
+```
+Qwen/Qwen2.5-Coder-1.5B-Instruct:sentiment       # latest version
+Qwen/Qwen2.5-Coder-1.5B-Instruct:sentiment:v1    # version 1
+meta-llama/Llama-2-7b-hf:code-assistant:v3         # version 3
+```
+
+### Registry Operations
+
+The `AdapterRegistry` tracks adapters with automatic version increments:
+
+```python
+from isa_model.serving.api.adapter_registry import AdapterRegistry
+
+registry = AdapterRegistry()
+
+# Register an adapter from a completed job
+entry = await registry.register(
+    base_model="Qwen/Qwen2.5-Coder-1.5B-Instruct",
+    adapter_name="sentiment",
+    adapter_path="output/lora-sft/final_adapter",
+    job_id="e5f6a7b8-...",
+)
+print(entry.model_id)  # "Qwen/Qwen2.5-Coder-1.5B-Instruct:sentiment:v1"
+
+# Register another version (auto-increments)
+entry_v2 = await registry.register(
+    base_model="Qwen/Qwen2.5-Coder-1.5B-Instruct",
+    adapter_name="sentiment",
+    adapter_path="output/lora-sft-v2/final_adapter",
+    job_id="f6a7b8c9-...",
+)
+print(entry_v2.model_id)  # "Qwen/Qwen2.5-Coder-1.5B-Instruct:sentiment:v2"
+
+# Resolve a model_id to an adapter
+adapter = await registry.resolve("Qwen/Qwen2.5-Coder-1.5B-Instruct:sentiment")
+print(adapter.adapter_path)  # latest version
+
+# List all adapters (latest versions)
+all_adapters = await registry.list_adapters()
+
+# Filter by base model
+qwen_adapters = await registry.list_adapters(
+    base_model="Qwen/Qwen2.5-Coder-1.5B-Instruct"
+)
+```
+
+### Adapter Entry Fields
+
+| Field | Description |
+|-------|-------------|
+| `base_model` | HuggingFace model path |
+| `adapter_name` | User-defined adapter name |
+| `adapter_path` | Filesystem path to adapter weights |
+| `version` | Auto-incremented version number |
+| `job_id` | ID of the training job that produced this adapter |
+| `created_at` | ISO timestamp of registration |
+| `model_id` | Full identifier (`base:name:vN`) |
+
+## Deploy to Ollama
+
+The export pipeline merges your LoRA adapter with the base model, converts to GGUF format, and pushes to Ollama as a new model tag -- all in one call.
+
+### Export Pipeline Steps
+
+```
+1. Merge     LoRA adapter weights into base model
+2. Convert   merged model to GGUF format (quantized)
+3. Push      GGUF model to Ollama via /api/create
+```
+
+### Deploy a Fine-Tuned Model
+
+```python
+from isa_model.training.export import ModelExporter
+
+exporter = ModelExporter(
+    ollama_host="http://localhost:11434",
+    quantization="q4_0",            # Quantization level for GGUF
+)
+
+result = await exporter.deploy(
+    base_model="Qwen/Qwen2.5-Coder-1.5B-Instruct",
+    adapter_path="output/lora-sft/final_adapter",
+    ollama_tag="qwen2-sentiment-v1",
+    system_prompt="You are a sentiment analysis assistant.",
+)
+
+if result.success:
+    print(f"Deployed to Ollama as: {result.ollama_tag}")
+    print(f"GGUF path: {result.gguf_path}")
+else:
+    print(f"Deploy failed: {result.error}")
+```
+
+### Use the Deployed Model
+
+Once deployed, the model is available through Ollama and the isA Model inference API:
+
+```bash
+# Direct Ollama usage
+ollama run qwen2-sentiment-v1
+
+# Via isA Model API
+curl -X POST http://localhost:8082/api/v1/invoke \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "qwen2-sentiment-v1",
+    "provider": "ollama",
+    "messages": [{"role": "user", "content": "I absolutely love this product!"}]
+  }'
+```
+
+### Quantization Options
+
+The `quantization` parameter controls GGUF compression. Smaller quantization means smaller files but slightly lower quality:
+
+| Quantization | Size Ratio | Quality | Use Case |
+|-------------|-----------|---------|----------|
+| `f16` | 100% | Best | Development, evaluation |
+| `q8_0` | ~50% | Very good | Production with spare RAM |
+| `q4_0` | ~25% | Good (default) | Production, balanced |
+| `q4_1` | ~27% | Good | Slightly better than q4_0 |
+
+### Ollama Tag Naming
+
+The `ModelExporter` provides a helper to generate sanitized Ollama tags:
+
+```python
+tag = exporter.build_ollama_tag(
+    base_model="Qwen/Qwen2.5-Coder-1.5B-Instruct",
+    adapter_name="sentiment",
+    version=1,
+)
+# Returns: "qwen2-5-coder-1-5b-instruct-sentiment-v1"
+```
+
+## End-to-End Workflow
+
+Here is the complete workflow from dataset to deployed model:
+
+```python
+import asyncio
+from isa_model.serving.api.dataset_manager import DatasetManager
+from isa_model.serving.api.finetune_manager import FineTuneJobManager
+from isa_model.serving.api.adapter_registry import AdapterRegistry
+from isa_model.training.export import ModelExporter
+
+async def finetune_and_deploy():
+    dataset_mgr = DatasetManager()
+    job_mgr = FineTuneJobManager()
+    registry = AdapterRegistry()
+    exporter = ModelExporter()
+
+    # 1. Upload dataset
+    jsonl = (
+        '{"instruction": "Classify sentiment", "input": "Great product!", "output": "positive"}\n'
+        '{"instruction": "Classify sentiment", "input": "Terrible service.", "output": "negative"}\n'
+    )
+    dataset = await dataset_mgr.upload_dataset("sentiment.jsonl", jsonl)
+    print(f"Dataset uploaded: {dataset.dataset_id}")
+
+    # 2. Launch training job
+    job = await job_mgr.create_job(
+        dataset_id=dataset.dataset_id,
+        base_model="Qwen/Qwen2.5-Coder-1.5B-Instruct",
+        method="lora",
+        hyperparams={"lora_r": 16, "num_epochs": 3},
+    )
+    print(f"Job created: {job.job_id} (status={job.status})")
+
+    # 3. (Training runs async — poll for completion)
+    # job = await job_mgr.get_job(job.job_id)
+
+    # 4. Register adapter checkpoint
+    entry = await registry.register(
+        base_model="Qwen/Qwen2.5-Coder-1.5B-Instruct",
+        adapter_name="sentiment",
+        adapter_path="output/lora-sft/final_adapter",
+        job_id=job.job_id,
+    )
+    print(f"Adapter registered: {entry.model_id}")
+
+    # 5. Deploy to Ollama
+    result = await exporter.deploy(
+        base_model="Qwen/Qwen2.5-Coder-1.5B-Instruct",
+        adapter_path=entry.adapter_path,
+        ollama_tag="qwen2-sentiment-v1",
+        system_prompt="You are a sentiment analysis assistant.",
+    )
+    print(f"Deployed: {result.ollama_tag}")
+
+asyncio.run(finetune_and_deploy())
+```
+
+## API Reference
+
+### Dataset Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/api/v1/training/datasets` | Upload and validate a JSONL dataset |
+| `GET` | `/api/v1/training/datasets` | List all datasets |
+| `GET` | `/api/v1/training/datasets/{dataset_id}` | Get dataset metadata |
+| `DELETE` | `/api/v1/training/datasets/{dataset_id}` | Delete a dataset |
+
+### Fine-Tuning Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/api/v1/training/finetune` | Launch a fine-tuning job |
+| `GET` | `/api/v1/training/finetune` | List all fine-tuning jobs |
+| `GET` | `/api/v1/training/finetune/{job_id}` | Get job status and metrics |
+
+### Lightning Training Endpoints
+
+These endpoints support the broader Lightning training framework (APO, GRPO, closed-loop algorithms):
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/api/v1/models/training/train` | Start a Lightning training run |
+| `GET` | `/api/v1/models/training/stats` | Get training statistics |
+| `POST` | `/api/v1/models/training/export` | Export training data |
+| `GET` | `/api/v1/models/training/config` | Read active training config |
+
+## Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `OLLAMA_HOST` | `http://localhost:11434` | Ollama server URL for deployment |
+| `CUDA_VISIBLE_DEVICES` | (all) | GPU selection for training |
+
+## Troubleshooting
+
+### "No CUDA GPU detected"
+
+LoRA SFT training requires a CUDA-capable GPU. Verify with:
+
+```bash
+python -c "import torch; print(torch.cuda.is_available())"
+```
+
+If `False`, ensure NVIDIA drivers and CUDA toolkit are installed.
+
+### "peft and trl required"
+
+Install the fine-tuning dependencies:
+
+```bash
+pip install peft trl transformers datasets
+```
+
+### GGUF conversion fails
+
+The export pipeline uses `llama.cpp` for GGUF conversion. Ensure it is installed:
+
+```bash
+pip install llama-cpp-python
+```
+
+### Ollama push fails
+
+Verify Ollama is running and accessible:
+
+```bash
+curl http://localhost:11434/api/tags
+```
