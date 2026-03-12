@@ -53,6 +53,166 @@ Migrations use:
 - backup-first patterns for destructive changes
 - idempotent DDL guards where possible
 
+## Health Failure Persistence
+
+The aggregator persists health failure counts and error timestamps in the server registry so that failure state survives process restarts. Each server record carries two fields:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `health_failures` | `int` | Consecutive failed health checks (resets to 0 on success) |
+| `last_error_at` | `datetime` | UTC timestamp of the most recent failure |
+
+### How it works
+
+A background health monitor runs on a 30-second interval. For each connected server:
+
+1. A session-level health check is issued.
+2. On **success**, `health_failures` is reset to `0` in both in-memory state and the registry.
+3. On **failure**, `health_failures` is incremented and `last_error_at` is updated.
+4. Once `health_failures` reaches the threshold (default `3`), the server status transitions to `DEGRADED`.
+
+Because failures are written to the registry (PostgreSQL or in-memory store), a restarted aggregator can pick up where it left off instead of assuming all servers are healthy.
+
+### Health check response
+
+The single-server health check returns:
+
+```json
+{
+  "server_id": "uuid",
+  "server_name": "my-server",
+  "status": "connected",
+  "is_healthy": true,
+  "consecutive_failures": 0,
+  "last_check": "2026-03-12T10:00:00Z",
+  "health_check_url": "http://localhost:8080/health"
+}
+```
+
+### Automatic recovery
+
+The `reconnect_unhealthy` method iterates over all servers in `DEGRADED` or `ERROR` status and attempts reconnection. On a successful reconnect, `health_failures` is reset to `0`.
+
+## Connection Event Tracking
+
+Every connection lifecycle transition is recorded as a `ConnectionEvent` in a per-server ring buffer (default capacity: 100 events per server). Events are stored newest-first and are available through MCP tools for diagnostics.
+
+### Event types
+
+| Event type | Emitted when |
+|------------|-------------|
+| `connect` | Session established successfully |
+| `disconnect` | Session closed (explicit or cleanup) |
+| `reconnect` | A reconnect cycle begins |
+| `error` | Connection fails after all retry attempts |
+| `resume` | SSE/streamable-HTTP session resumption attempted |
+
+### Event structure
+
+Each event contains:
+
+```json
+{
+  "event_type": "connect",
+  "timestamp": "2026-03-12T10:00:00Z",
+  "server_id": "uuid",
+  "details": "Connected successfully"
+}
+```
+
+## Aggregator Observability Tools
+
+The following MCP tools expose health and connection state at runtime. They are registered under `AggregatorTools` and available to any connected client.
+
+### `aggregator_health`
+
+Run a health check across all connected servers or a single server.
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `server_name` | `string` | Filter to a specific server (optional) |
+| `server_id` | `string` | Filter by UUID (optional) |
+
+Returns a list of health status objects (see [health check response](#health-check-response) above).
+
+### `get_aggregator_state`
+
+Dashboard-style snapshot of the entire aggregation layer.
+
+Returns:
+
+```json
+{
+  "total_servers": 5,
+  "connected_servers": 3,
+  "disconnected_servers": 1,
+  "error_servers": 1,
+  "total_tools": 42,
+  "servers": [
+    { "id": "uuid", "name": "my-server", "status": "connected", "tool_count": 12 }
+  ]
+}
+```
+
+### `get_server_connection_info`
+
+Detailed connection metadata for a single server including transport type, uptime, session ID, last event ID, and the 10 most recent events.
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `server_name` | `string` | Server name (optional) |
+| `server_id` | `string` | Server UUID (optional) |
+
+Returns:
+
+```json
+{
+  "server_id": "uuid",
+  "transport_type": "stdio",
+  "connected_at": "2026-03-12T09:00:00Z",
+  "uptime_seconds": 3600,
+  "session_id": "abc123",
+  "last_event_id": "evt-99",
+  "recent_events": [
+    { "event_type": "connect", "timestamp": "2026-03-12T09:00:00Z", "details": "Connected successfully" }
+  ]
+}
+```
+
+### `get_connection_history`
+
+Full connection event history for a server, useful for post-incident analysis.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `server_name` | `string` | | Server name (optional) |
+| `server_id` | `string` | | Server UUID (optional) |
+| `limit` | `integer` | `50` | Max events to return (1-100) |
+
+Returns an array of event objects, newest first.
+
+### `reconnect_server`
+
+Force-disconnect and reconnect a specific server, rediscovering its tools. Use this when a server is misbehaving or after its configuration changes.
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `server_name` | `string` | Server name (optional) |
+| `server_id` | `string` | Server UUID (optional) |
+
+Returns:
+
+```json
+{
+  "success": true,
+  "server_id": "uuid",
+  "status": "connected",
+  "tools_discovered": 12
+}
+```
+
+On reconnect, health failures are reset to `0` and a `reconnect` event is recorded in the connection history.
+
 ## Related
 
 - [Security](./security)
