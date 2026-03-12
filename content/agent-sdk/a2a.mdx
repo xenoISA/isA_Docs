@@ -89,6 +89,134 @@ Expected shape:
 }
 ```
 
+## Heartbeat Streaming
+
+Long-running A2A tasks risk client-side HTTP read timeouts when the server takes more than a few seconds to respond. The SDK solves this with **heartbeat streaming** — periodic keepalive events sent over SSE while the runner is processing.
+
+### How It Works
+
+When a client sends a `message/stream` (or `SendStreamingMessage`) request, the server adapter uses `stream_rpc_events()` to manage the full lifecycle:
+
+1. **Submitted** — an initial event is yielded immediately, confirming the task was received.
+2. **Working** — a second event confirms processing has started.
+3. **Heartbeat keepalives** — while the runner executes, a `working` event is emitted every `heartbeat_interval` seconds (default: **15 seconds**). Each heartbeat includes elapsed time:
+   ```json
+   {
+     "jsonrpc": "2.0",
+     "id": "rpc_abc123",
+     "result": {
+       "kind": "task",
+       "id": "task_def456",
+       "status": {
+         "state": "working",
+         "message": "Processing... (30s elapsed)",
+         "timestamp": "2026-03-12T10:00:30+00:00"
+       }
+     }
+   }
+   ```
+4. **Completed** (or **Failed**) — the final event carries the result artifacts or error.
+
+This sequence keeps the HTTP connection alive regardless of how long the underlying task takes.
+
+### Server Configuration
+
+The heartbeat interval is set when calling `stream_rpc_events()`. The default route registered by `register_a2a_fastapi_routes` uses the adapter's default of 15 seconds. To customize it in a manual handler:
+
+```python
+from fastapi import Request
+from fastapi.responses import StreamingResponse
+import json
+
+@app.post("/a2a")
+async def custom_a2a_handler(request: Request):
+    body = await request.json()
+    method = body.get("method")
+
+    if method in {"message/stream", "SendStreamingMessage"}:
+        async def event_gen():
+            async for payload in adapter.stream_rpc_events(
+                body, heartbeat_interval=20  # seconds
+            ):
+                yield f"data: {json.dumps(payload)}\n\n"
+
+        return StreamingResponse(event_gen(), media_type="text/event-stream")
+
+    result = await adapter.handle_rpc(body)
+    return result
+```
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `heartbeat_interval` | `int` | `15` | Seconds between keepalive events during task processing |
+
+### Client-Side Handling
+
+When consuming an SSE stream, heartbeat events arrive as `working` status updates with no artifacts. Filter them out to collect only the final result:
+
+```python
+from isa_agent_sdk import A2AClient
+
+client = A2AClient("http://localhost:8102", auth_token="<token>")
+
+async for event in client.stream_message(
+    "http://localhost:8102/a2a",
+    "Long-running analysis task",
+):
+    result = event.get("result", {})
+    status = result.get("status", {})
+    state = status.get("state", "") if isinstance(status, dict) else str(status)
+
+    # Skip heartbeat/progress events (working state with no artifacts)
+    if state in ("submitted", "working") and not result.get("artifacts"):
+        continue
+
+    if state == "completed":
+        for artifact in result.get("artifacts", []):
+            for part in artifact.get("parts", []):
+                if part.get("kind") == "text":
+                    print(part["text"])
+
+    if state == "failed":
+        error = result.get("error", {})
+        print(f"Task failed: {error.get('message', 'unknown error')}")
+```
+
+### Auto-Streaming via Delegation
+
+The SDK's `delegate_to_team` tool automatically switches to streaming delegation for teams whose `timeout >= 180s`. This means long-running inter-agent calls get heartbeat protection without any client code changes. The delegation client skips heartbeat events internally and returns only the final result.
+
+Configure team timeout to enable auto-streaming:
+
+```yaml
+teams:
+  entries:
+    - name: isa_vibe
+      url: "http://127.0.0.1:18793"
+      rpc_path: "/a2a"
+      timeout: 600.0  # >= 180s triggers auto-streaming with heartbeats
+    - name: isa_trade
+      url: "http://127.0.0.1:18790"
+      rpc_path: "/a2a"
+      timeout: 120.0  # < 180s uses synchronous send_message
+```
+
+### Connection Drop Prevention
+
+Without heartbeats, three layers can terminate idle connections:
+
+| Layer | Typical Timeout | Heartbeat Solution |
+|-------|----------------|--------------------|
+| HTTP client read timeout | 30-60s | Heartbeats reset the read timer every 15s |
+| Reverse proxy (nginx, APISIX) | 60s | SSE data frames keep the connection active |
+| Load balancer idle timeout | 60-120s | Regular traffic prevents idle eviction |
+
+By emitting a heartbeat every 15 seconds, the SDK stays well within all common timeout windows. For environments with aggressive timeouts (e.g., 10s), reduce the interval accordingly:
+
+```python
+adapter.stream_rpc_events(body, heartbeat_interval=5)
+```
+
 ## Notes
 
 - For quick local functional testing, `A2A_AUTH_REQUIRED=false` can be used.
