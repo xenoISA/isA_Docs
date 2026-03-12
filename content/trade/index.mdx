@@ -109,6 +109,118 @@ The Risk Agent enforces hard limits that **cannot be overridden**:
 | yfinance, Finnhub, FRED | Market data |
 | CCXT | Crypto exchange connectivity |
 
+## Risk Management & Approvals
+
+isA Trade enforces multiple layers of safety controls that protect the portfolio from catastrophic losses. These controls are **hardcoded and non-overridable** — no agent, operator, or configuration change can bypass them during live operation.
+
+<Callout type="error">
+**Safety-critical system.** The risk management rules described below are enforced at the code level. Disabling or weakening them requires source code changes and should never be done in a production environment.
+</Callout>
+
+### Live Trading Approval Gate
+
+Before any real money is at risk, the system requires an explicit approval gate. This prevents accidental live trading during development, testing, or misconfiguration.
+
+**How it works:**
+
+1. The orchestrator starts with a `TRADING_MODE` environment variable (`paper` or `live`).
+2. When `TRADING_MODE=live`, the system checks the `LIVE_TRADING_GATE` environment variable.
+3. If `LIVE_TRADING_GATE` is not set to exactly `approved` (case-insensitive), the system **silently falls back to paper trading** using a simulated `PaperBroker`.
+4. Even when the gate is approved, a live broker (Alpaca, CCXT, Moomoo, or Polymarket) must also be configured with valid API keys — otherwise the system still falls back to paper mode.
+
+<Callout type="warn">
+**Double-lock design.** Both `TRADING_MODE=live` AND `LIVE_TRADING_GATE=approved` must be set for real orders to execute. If either is missing or incorrect, the system uses the paper broker with no real money at risk.
+</Callout>
+
+```bash
+# Paper trading (default — no gate required)
+TRADING_MODE=paper
+
+# Live trading — requires both settings
+TRADING_MODE=live
+LIVE_TRADING_GATE=approved
+ALPACA_API_KEY=your-key-here  # or other broker credentials
+```
+
+### Risk Agent Veto Power
+
+The Risk Agent acts as Chief Risk Officer (CRO) with **absolute veto authority** over all trade decisions. This is the most powerful safety mechanism in the system.
+
+**Veto protocol:**
+
+- The Risk Agent's veto is **absolute** — there is no appeal process and no override mechanism.
+- When a veto is issued, **immediate compliance is required** with no exceptions.
+- The Orchestrator **must** respect the veto even if the Research Agent and Technical Agent both strongly recommend the trade.
+- Other agents may request clarification on a veto but **cannot challenge the decision**.
+- All veto reasons are logged to the audit trail but are not subject to debate.
+
+**The Risk Agent vetoes a trade when any of these conditions are true:**
+
+| Condition | Threshold | Effect |
+|-----------|-----------|--------|
+| Position risk too high | > 2% of portfolio per position | Veto with suggested smaller size |
+| Sector over-concentrated | > 25% in one sector | Veto |
+| Daily loss limit hit | > 3% loss in current day | Veto all new trades |
+| Too many open positions | > 15 positions | Veto |
+| Drawdown circuit breaker | > 10% from peak equity | Veto all trading |
+| High correlation | > 0.8 with existing positions | Veto |
+
+When a trade is vetoed, the `ValidationResult` includes:
+- `veto: true` and a `veto_reason` explaining which rule was violated
+- A `risk_score` (0-100) indicating overall risk level
+- `suggested_adjustments` when applicable (e.g., a smaller position size that would pass)
+
+### Circuit Breakers
+
+Circuit breakers are automatic safety triggers managed by the **Kill Switch** module. When a circuit breaker trips, trading halts immediately without human intervention.
+
+<Callout type="error">
+**Circuit breakers cannot be disabled.** They are initialized at startup with the execution engine and run continuously. When triggered, they send critical alerts via the notification system and record the event in Prometheus metrics.
+</Callout>
+
+**Circuit breaker thresholds:**
+
+| Trigger | Threshold | Behavior |
+|---------|-----------|----------|
+| **Max drawdown** | 10% from peak equity | Halt → 5 min cooldown |
+| **Daily loss** | 3% of current equity | Halt → 5 min cooldown |
+| **Order rate limit** | 20 orders per minute | Halt → 5 min cooldown |
+| **Consecutive losses** | 5 losing trades in a row | Halt → 5 min cooldown |
+
+**Kill Switch states:**
+
+```
+ACTIVE ──→ COOLDOWN ──→ ACTIVE
+  │            ↑
+  │     (auto-halt: drawdown, daily loss,
+  │      rate limit, consecutive losses)
+  │
+  └──→ HALTED ──→ ACTIVE
+   (manual halt)   (manual resume)
+```
+
+- **ACTIVE** — Normal trading. All orders are processed.
+- **COOLDOWN** — Automatic halt triggered by a circuit breaker. Trading resumes automatically after a 5-minute cooldown period. No manual intervention required.
+- **HALTED** — Manual halt triggered by an operator (or emergency close). Requires explicit `resume()` call to restart trading.
+
+**Emergency close:** The `/api/v1/execute/emergency-close` endpoint triggers an immediate HALT, closes all open positions, and sends critical alerts. Use this when you need to exit the market immediately.
+
+### Risk Management Summary
+
+| Rule | Limit | Enforced By |
+|------|-------|-------------|
+| Max position risk | 2% of portfolio | Risk Agent (veto) |
+| Max position size | 10% of portfolio | Risk Agent (warning) |
+| Max sector concentration | 25% | Risk Agent (veto) |
+| Daily loss circuit breaker | 3% | Kill Switch (auto-halt) + Risk Agent (veto) |
+| Drawdown circuit breaker | 10% | Kill Switch (auto-halt) + Risk Agent (veto) |
+| Max open positions | 15 | Risk Agent (veto) |
+| Max correlation | 0.8 | Risk Agent (veto) |
+| Order rate limit | 20/min | Kill Switch (auto-halt) |
+| Consecutive losses | 5 | Kill Switch (auto-halt) |
+| Position sizing | Half-Kelly criterion | Risk Agent (sizing) |
+| Live trading gate | `LIVE_TRADING_GATE=approved` | Execution module (startup) |
+
 ## Data Sources
 
 | Source | Data |
