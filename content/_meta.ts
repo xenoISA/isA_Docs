@@ -24,6 +24,7 @@ export default {
   trade: 'Trade',
   chain: 'Chain',
   frame: 'Frame',
+  marketing: 'Marketing',
   '-----': {
     type: 'separator',
     title: 'Learn'

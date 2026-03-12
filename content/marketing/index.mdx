@@ -1,0 +1,170 @@
+# isA Marketing
+
+Multi-agent marketing analytics platform with 7 specialized AI agents for automated campaign analysis, content management, SEO optimization, and compliance monitoring.
+
+## Overview
+
+isA Marketing is an intelligent multi-agent system that automates marketing analytics workflows. Through natural language interaction, users can request campaign analysis, generate comprehensive reports, receive audience insights, and manage content — all without needing technical expertise in data analysis.
+
+The platform runs as a single-container architecture where all agents operate in-process via the SwarmOrchestrator pipeline with shared state, communicating through NATS messaging and backed by PostgreSQL, Redis, Qdrant, and MinIO from the isA Cloud infrastructure.
+
+| Agent | Role |
+|-------|------|
+| **Orchestrator** | Marketing Director — coordinates agents, routes tasks, manages workflows |
+| **Campaign Analyst** | Campaign metrics analysis, ROI calculation, conversion tracking |
+| **Report Generator** | Performance reports, executive summaries, CSV/PDF export |
+| **Audience Insights** | Segment analysis, cohort identification, behavioral analysis |
+| **Content Agent** | Content creation, management, and optimization |
+| **SEO Agent** | Search engine optimization analysis and recommendations |
+| **Compliance Agent** | Regulatory compliance monitoring and enforcement |
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                  Marketing Platform                      │
+│                   API (Port 18792)                       │
+└───────────────────────┬─────────────────────────────────┘
+                        ↓
+┌─────────────────────────────────────────────────────────┐
+│           Orchestrator (Marketing Director)              │
+│    Decision engine • A2A adapter • Shared state         │
+└──┬──────┬──────┬──────┬──────┬──────┬───────────────────┘
+   ↓      ↓      ↓      ↓      ↓      ↓
+┌──────┐┌──────┐┌──────┐┌──────┐┌─────┐┌──────────┐
+│Camp. ││Report││Audi. ││Cont. ││ SEO ││Compliance│
+│Analyst││Gen.  ││Insig.││Agent ││Agent││  Agent   │
+└──────┘└──────┘└──────┘└──────┘└─────┘└──────────┘
+   │       │       │       │       │       │
+   └───────┴───────┴───────┴───────┴───────┘
+                     ↓
+┌─────────────────────────────────────────────────────────┐
+│              External Integrations                       │
+│  Google Ads • Facebook Ads • LinkedIn Ads               │
+│  Google Analytics • HubSpot • Salesforce                │
+└─────────────────────────────────────────────────────────┘
+                     ↓
+┌─────────────────────────────────────────────────────────┐
+│              Infrastructure (isA Cloud)                  │
+│  PostgreSQL • Redis • Qdrant • NATS • MinIO             │
+└─────────────────────────────────────────────────────────┘
+```
+
+## Key Features
+
+### Campaign Analytics
+
+- Campaign metrics analysis and ROI calculation
+- Conversion tracking and attribution modeling
+- Campaign comparison and benchmarking
+- Performance trend analysis
+
+### Report Generation
+
+- Automated performance reports
+- Executive summaries with AI-powered insights
+- Multiple export formats (CSV, PDF)
+- Standardized metrics and calculations
+
+### Audience Insights
+
+- Segment analysis and profiling
+- Cohort identification
+- Behavioral analysis and targeting recommendations
+- Cross-channel audience mapping
+
+### Content Management
+
+- Content creation assistance and optimization
+- Content performance tracking
+- Cross-channel content coordination
+
+### SEO Optimization
+
+- Search engine optimization analysis
+- Keyword and ranking recommendations
+- Technical SEO auditing
+
+### Compliance Monitoring
+
+- Regulatory compliance checks
+- Policy enforcement across campaigns
+- Audit trail and reporting
+
+## Platform Integrations
+
+| Platform | API Type | Auth Method | Rate Limit | Data Sync |
+|----------|----------|-------------|------------|-----------|
+| Google Ads | REST | OAuth 2.0 | 15k/day | 15 min |
+| Facebook Ads | Graph API | OAuth 2.0 | 200/hr | 15 min |
+| LinkedIn Ads | REST | OAuth 2.0 | 100/min | 30 min |
+| Google Analytics | REST | OAuth 2.0 | 50k/day | 15 min |
+| HubSpot | REST | API Key | 100/10s | Real-time |
+| Salesforce | REST | OAuth 2.0 | 100k/day | 30 min |
+
+## Quick Start
+
+```bash
+# Clone the repository
+git clone https://github.com/xenoISA/isA_Marketing.git
+cd isA_Marketing
+
+# Install dependencies
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+
+# Ensure isA Cloud infrastructure is running (PostgreSQL, Redis, Qdrant, NATS, MinIO)
+
+# Start with Docker Compose
+docker-compose up -d
+
+# Or run directly
+uvicorn src.orchestrator.main:app --port 18792 --reload
+```
+
+The service exposes a health check at `http://localhost:18792/health`.
+
+## Tech Stack
+
+| Tool | Purpose |
+|------|---------|
+| Python 3.11+ | Language |
+| FastAPI | API service |
+| isA Agent SDK | Agent framework (SwarmOrchestrator) |
+| PostgreSQL | Campaign data, analytics storage |
+| Redis | Cache, sessions |
+| Qdrant | Vector embeddings for content/audience |
+| NATS | Inter-agent messaging |
+| MinIO | Report and media storage |
+
+## Project Structure
+
+```
+isA_Marketing/
+├── src/
+│   ├── api/                  # FastAPI routes
+│   ├── orchestrator/         # Marketing Director, decision engine, A2A adapter
+│   ├── campaign_analyst/     # Campaign metrics and ROI analysis
+│   ├── campaign_manager/     # Campaign lifecycle management
+│   ├── report_generator/     # Report creation and export
+│   ├── audience_insights/    # Segment and cohort analysis
+│   ├── content_agent/        # Content management and optimization
+│   ├── seo_agent/            # SEO analysis and recommendations
+│   ├── compliance_agent/     # Regulatory compliance monitoring
+│   └── core/                 # Shared config, clients, events, logging
+├── tests/                    # Test pyramid (unit, component, integration, api, smoke)
+├── config/                   # Service configuration (vibe.yaml)
+├── deployment/               # Environment configs, requirements
+├── docs/                     # Internal project documentation, PRD, design docs
+├── k8s/                      # Kubernetes manifests
+├── Dockerfile                # Container build
+└── docker-compose.yml        # Local development
+```
+
+## Roadmap
+
+| Version | Target | Features |
+|---------|--------|----------|
+| v0.1.0 (MVP) | Q1 2026 | Basic campaign analysis, performance reports, segment analysis, orchestrator routing |
+| v0.2.0 | Q2 2026 | Conversion tracking, executive summaries, PDF export, cohort analysis, multi-step workflows |
+| v1.0.0 | Q3 2026 | Full feature set, advanced attribution, targeting recommendations, A2A protocol integration |
