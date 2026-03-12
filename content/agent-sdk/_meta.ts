@@ -17,6 +17,7 @@ export default {
   'human-in-the-loop': 'Human-in-the-Loop',
   'desktop-execution': 'Desktop Execution',
   checkpointing: 'Checkpointing',
+  oauth: 'OAuth Transport',
   'deployment-guide': 'Deployment',
   testing: 'Testing',
   examples: 'Examples',

@@ -1,0 +1,326 @@
+# OAuth Transport & Keychain Integration
+
+The Agent SDK supports direct HTTP transport to subscription providers (Anthropic, OpenAI/Codex) using OAuth tokens sourced from CLI credential stores. This bypasses local CLI subprocesses, enabling faster request dispatch with automatic token caching and expiry management.
+
+## Overview
+
+The OAuth transport sits inside the **Proxy Service** and provides an alternative to the default CLI-based transport. When enabled, the `ProxyService` reads OAuth access tokens from local credential stores and sends requests directly to provider APIs:
+
+| Provider | Endpoint | Token Source |
+|----------|----------|--------------|
+| `anthropic-sub` | `https://api.anthropic.com/v1/messages` | macOS Keychain or `ANTHROPIC_OAUTH_TOKEN` env var |
+| `codex-sub` | `https://chatgpt.com/backend-api/codex/responses` | `~/.codex/auth.json` |
+
+If no valid OAuth token is available, the service automatically falls back to CLI transport, so you always have a working path.
+
+## Architecture
+
+```
+                        ┌──────────────────────┐
+                        │     ProxyService      │
+                        │                       │
+   ChatCompletionReq ──►│  _resolve_transport() │
+                        │       │               │
+                        │  ┌────▼─────┐         │
+                        │  │ "oauth"? │         │
+                        │  └────┬─────┘         │
+                        │   yes │   no           │
+                        │  ┌────▼─────┐ ┌───────▼───────┐
+                        │  │ OAuth    │ │ CLI / HTTP     │
+                        │  │ HTTP     │ │ Transport      │
+                        │  └────┬─────┘ └───────┬───────┘
+                        │       │               │        │
+                        └───────┼───────────────┼────────┘
+                                │               │
+                    ┌───────────▼───┐   ┌───────▼────────┐
+                    │ OAuthToken    │   │ Local CLI      │
+                    │ Reader        │   │ subprocess     │
+                    │ (Keychain /   │   │                │
+                    │  auth.json)   │   │                │
+                    └───────────────┘   └────────────────┘
+```
+
+## Configuration
+
+### Enable OAuth Transport
+
+Set the transport mode per provider via config dict or environment variables:
+
+```python
+from isa_agent_sdk.services.proxy import ProxyService
+
+# Via config dict
+service = ProxyService(config={
+    "codex_transport": "oauth",
+    "anthropic_transport": "oauth",
+})
+```
+
+Or via environment variables:
+
+```bash
+export PROXY_CODEX_TRANSPORT=oauth
+export PROXY_ANTHROPIC_TRANSPORT=oauth
+```
+
+The default transport is `"http"` (local proxy endpoint). Setting it to `"oauth"` activates direct API calls with OAuth credentials.
+
+### Codex (OpenAI) Credential Path
+
+The Codex OAuth reader looks for `~/.codex/auth.json` by default. Override with:
+
+```python
+service = ProxyService(config={
+    "codex_transport": "oauth",
+    "codex_oauth_auth_path": "/custom/path/auth.json",
+})
+```
+
+Or via environment variable:
+
+```bash
+export CODEX_OAUTH_AUTH_PATH=/custom/path/auth.json
+```
+
+## macOS Keychain Integration
+
+On macOS, Anthropic (Claude) OAuth tokens are read from the system Keychain using the `security` CLI. The SDK looks for a generic password entry with service name **`Claude Code-credentials`**.
+
+### How It Works
+
+1. The `OAuthTokenReader` calls `security find-generic-password -s "Claude Code-credentials" -w`
+2. The returned JSON contains `claudeAiOauth.accessToken` and `claudeAiOauth.expiresAt` (milliseconds)
+3. The token is cached in memory until it expires (with a configurable buffer)
+4. If the Keychain entry is missing or expired, the reader falls back to `ANTHROPIC_OAUTH_TOKEN`
+
+### Keychain Entry Structure
+
+The Keychain stores a JSON blob with this shape:
+
+```json
+{
+  "claudeAiOauth": {
+    "accessToken": "sk-ant-oat01-...",
+    "refreshToken": "sk-ant-ort01-...",
+    "expiresAt": 1741872000000,
+    "scopes": ["user:inference"]
+  }
+}
+```
+
+The `expiresAt` field is in **milliseconds** since epoch. The SDK converts it to seconds and checks against the current time minus an expiry buffer (default: 60 seconds).
+
+### Platform Fallback
+
+| Platform | Primary Source | Fallback |
+|----------|---------------|----------|
+| macOS (`darwin`) | Keychain (`Claude Code-credentials`) | `ANTHROPIC_OAUTH_TOKEN` env var |
+| Linux / other | N/A | `ANTHROPIC_OAUTH_TOKEN` env var |
+
+## Codex (OpenAI) OAuth Tokens
+
+Codex tokens are read from `~/.codex/auth.json`, which is written by the Codex CLI after authentication.
+
+### auth.json Structure
+
+```json
+{
+  "auth_mode": "chatgpt",
+  "tokens": {
+    "access_token": "eyJhbGciOiJSUzI1NiIs...",
+    "refresh_token": "rt_...",
+    "account_id": "account-123"
+  },
+  "last_refresh": "2026-03-10T09:00:00Z"
+}
+```
+
+The `access_token` is a JWT. The SDK extracts the `exp` claim to determine token validity. If the file is updated externally (e.g., by the Codex CLI refreshing), the SDK detects the mtime change and re-reads the token.
+
+### Codex Responses API
+
+When using OAuth transport, Codex requests go to `chatgpt.com/backend-api/codex/responses` (the Responses API), not `api.openai.com`. The SDK automatically:
+
+1. Converts Chat Completions request format to Responses API format
+2. Streams the SSE response
+3. Converts back to Chat Completions format for the caller
+
+This is transparent to consumers of the `ProxyService`.
+
+## Token Caching & Expiry
+
+The `OAuthTokenReader` implements smart caching:
+
+- **In-memory cache** per provider ID with `(access_token, expires_at)` tuples
+- **Expiry buffer** (default 60s) refreshes tokens before they actually expire
+- **File mtime tracking** for Codex: re-reads `auth.json` only when the file changes
+- **Automatic invalidation**: expired tokens are evicted and re-read from source
+
+```python
+from isa_agent_sdk.services.proxy.oauth_token_reader import OAuthTokenReader
+
+reader = OAuthTokenReader(expiry_buffer_seconds=120)  # Refresh 2 min early
+
+# Check token availability without exposing the token
+if reader.has_token("codex-sub"):
+    print("Codex OAuth token available")
+
+if reader.has_token("anthropic-sub"):
+    print("Anthropic OAuth token available")
+
+# Clear cached tokens (force re-read)
+reader.clear_cache()                  # Clear all
+reader.clear_cache("anthropic-sub")   # Clear specific provider
+```
+
+## Subscription Provider Authentication Flow
+
+The full request flow when OAuth transport is enabled:
+
+```
+1. Client calls ProxyService.chat_completion(request)
+2. ProviderRegistry routes model → provider (e.g., "claude-opus-4-6" → "anthropic-sub")
+3. ProxyService._resolve_provider_transport("anthropic-sub") → "oauth"
+4. ProxyService._forward_via_oauth_http() is called:
+   a. OAuthTokenReader.get_token("anthropic-sub") reads from Keychain/env
+   b. If no token → returns None → falls back to CLI transport
+   c. If token valid → sends HTTP request with auth headers:
+      - Anthropic: x-api-key: <token>
+      - Codex: Authorization: Bearer <token>
+5. Response is normalized to OpenAI Chat Completions format
+6. Caller receives standard ChatCompletionResponse
+```
+
+### Authentication Headers
+
+| Provider | Header | Format |
+|----------|--------|--------|
+| `anthropic-sub` | `x-api-key` | Raw token value |
+| `codex-sub` | `Authorization` | `Bearer <token>` |
+
+## Credential Store (Vault)
+
+For production deployments with multiple subscription accounts, the SDK also provides a `CredentialStore` protocol with two implementations:
+
+### VaultCredentialStore
+
+Backed by the `isA_user` vault service for encrypted credential management:
+
+```python
+from isa_agent_sdk.services.proxy import VaultCredentialStore
+
+store = VaultCredentialStore(
+    vault_url="http://localhost:8214",
+    user_id="user-123",
+)
+await store.load_mappings()  # Load existing credentials from vault
+
+# Store a new credential
+vault_id = await store.store_credential(
+    provider_id="anthropic-sub",
+    account_name="team-account",
+    credential="sk-ant-...",
+    metadata={"team": "engineering"},
+)
+
+# Retrieve
+api_key = await store.get_credential("anthropic-sub", "team-account")
+
+# Rotate
+await store.rotate_credential("anthropic-sub", "team-account", "sk-ant-new-...")
+
+# Health check
+healthy = await store.health_check()
+```
+
+### EnvCredentialStore
+
+Fallback for CI and headless environments:
+
+```python
+from isa_agent_sdk.services.proxy import EnvCredentialStore
+
+store = EnvCredentialStore(env_prefix="ISA_CREDENTIAL")
+
+# Reads from ISA_CREDENTIAL_ANTHROPIC_SUB_TEAM_ACCOUNT env var
+api_key = await store.get_credential("anthropic-sub", "team-account")
+```
+
+Environment variable naming: `{prefix}_{PROVIDER}_{ACCOUNT}` with hyphens replaced by underscores, uppercased.
+
+## Model Tier Resolution
+
+The subscription resolver maps model tiers to provider-specific models:
+
+```python
+from isa_agent_sdk.core.config.subscription_resolver import (
+    ModelTier, resolve_model_for_tier
+)
+
+# Resolve best model for a tier within a provider context
+model, provider = resolve_model_for_tier(
+    ModelTier.REASONING,
+    active_provider="anthropic-sub",
+)
+# → ("claude-opus-4-6", "anthropic-sub")
+
+model, provider = resolve_model_for_tier(
+    ModelTier.FAST,
+    active_provider="codex-sub",
+)
+# → ("gpt-4.1-nano", "codex-sub")
+```
+
+### Tier Defaults
+
+| Tier | `anthropic-sub` | `codex-sub` |
+|------|----------------|-------------|
+| REASONING | `claude-opus-4-6` | `gpt-5.4` |
+| FAST | `claude-3-haiku-20240307` | `gpt-4.1-nano` |
+| EMBEDDING | `text-embedding-3-small` (via openai) | `text-embedding-3-small` (via openai) |
+
+Override tiers via environment variables:
+
+```bash
+export REASON_MODEL=claude-sonnet-4-20250514
+export REASON_MODEL_PROVIDER=anthropic-sub
+export FAST_MODEL=gpt-4.1-mini
+export FAST_MODEL_PROVIDER=codex-sub
+```
+
+## Environment Variables Reference
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `PROXY_ANTHROPIC_TRANSPORT` | Transport mode for Anthropic (`http` or `oauth`) | `http` |
+| `PROXY_CODEX_TRANSPORT` | Transport mode for Codex (`http` or `oauth`) | `http` |
+| `CODEX_OAUTH_AUTH_PATH` | Custom path to Codex `auth.json` | `~/.codex/auth.json` |
+| `ANTHROPIC_OAUTH_TOKEN` | Anthropic OAuth token (fallback when Keychain unavailable) | — |
+| `REASON_MODEL` | Override reasoning tier model | — |
+| `REASON_MODEL_PROVIDER` | Override reasoning tier provider | — |
+| `FAST_MODEL` | Override fast tier model | — |
+| `FAST_MODEL_PROVIDER` | Override fast tier provider | — |
+| `INTERNAL_SERVICE_SECRET` | Secret for vault service authentication | dev default |
+
+## Troubleshooting
+
+### "No OAuth token available" — falls back to CLI
+
+- **Codex**: Check that `~/.codex/auth.json` exists and contains a valid `access_token`. Run `codex auth` to re-authenticate.
+- **Anthropic**: On macOS, verify the Keychain entry exists: `security find-generic-password -s "Claude Code-credentials"`. Alternatively, set `ANTHROPIC_OAUTH_TOKEN`.
+
+### Token expired immediately after read
+
+The default expiry buffer is 60 seconds. If your token has less than 60 seconds remaining, the reader returns `None`. Increase the buffer if your tokens are short-lived:
+
+```python
+reader = OAuthTokenReader(expiry_buffer_seconds=30)
+```
+
+### Keychain access denied
+
+On macOS, you may see a system prompt asking to allow access to "Claude Code-credentials". Grant access to the `security` CLI or your terminal application.
+
+### Wrong endpoint for Codex
+
+The OAuth transport sends Codex requests to `chatgpt.com/backend-api/codex/responses`, not `api.openai.com`. This is intentional — ChatGPT Plus OAuth tokens authenticate against the ChatGPT backend, not the OpenAI API directly.
