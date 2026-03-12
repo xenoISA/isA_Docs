@@ -221,6 +221,181 @@ ACTIVE ──→ COOLDOWN ──→ ACTIVE
 | Position sizing | Half-Kelly criterion | Risk Agent (sizing) |
 | Live trading gate | `LIVE_TRADING_GATE=approved` | Execution module (startup) |
 
+## Monitoring & Alerting
+
+isA Trade exposes Prometheus metrics via a `/metrics` endpoint and ships alerting rules for production monitoring. Metrics use the `isa_trade_*` naming prefix and are defined in `src/orchestrator/metrics.py`.
+
+### Key Metrics
+
+| Metric | Type | Description |
+|--------|------|-------------|
+| `isa_trade_orders_total` | Counter | Total orders submitted (labels: `side`, `status`, `broker`) |
+| `isa_trade_order_latency_seconds` | Histogram | Order submission latency by broker |
+| `isa_trade_slippage_bps` | Histogram | Order slippage in basis points |
+| `isa_trade_kill_switch_state` | Gauge | Kill switch state (0=active, 1=halted, 2=cooldown) |
+| `isa_trade_portfolio_equity` | Gauge | Current portfolio equity in dollars |
+| `isa_trade_active_positions` | Gauge | Number of active positions |
+| `isa_trade_agent_duration_seconds` | Histogram | Per-agent invocation duration (labels: `agent`) |
+| `isa_trade_http_requests_total` | Counter | HTTP requests by method, path, and status code |
+
+### Alerting Rules
+
+Alerting rules live in `deployment/prometheus/alerts.yml` and cover three categories. Validate with `promtool check rules deployment/prometheus/alerts.yml`.
+
+#### Kill Switch Alerts
+
+| Alert | Expression | Severity | Description |
+|-------|-----------|----------|-------------|
+| `TradingKillSwitchHalted` | `isa_trade_kill_switch_state == 1` | Critical | Kill switch entered HALTED state. All trading suspended. Manual `resume()` required. |
+| `TradingCircuitBreakerTripped` | `isa_trade_kill_switch_state != 0` | Warning | Kill switch is not ACTIVE. Check logs for the circuit breaker trigger reason. |
+
+#### Risk Alerts
+
+| Alert | Expression | Severity | Description |
+|-------|-----------|----------|-------------|
+| `TradingDrawdownExceeded` | Drawdown from 24h peak > 5% | Critical | Portfolio drawdown exceeded 5% threshold. Review positions. |
+| `TradingDailyLossExceeded` | 24h loss > 2% | Critical | Portfolio lost more than 2% in 24 hours. Assess risk exposure. |
+
+#### Availability Alerts
+
+| Alert | Expression | Severity | Description |
+|-------|-----------|----------|-------------|
+| `TradingServiceDown` | `up{job="isa-trade"} == 0` for 1m | Critical | Prometheus cannot scrape the service. Check pod status. |
+| `TradingHighErrorRate` | 5xx rate > 5% over 5m | Warning | HTTP error rate above threshold. Check application logs. |
+| `TradingHighOrderLatency` | P95 order latency > 5s over 5m | Warning | Order latency degraded. Possible broker or market data issues. |
+
+### Dashboard Setup
+
+To set up Prometheus scraping, add the isA Trade target to your Prometheus config:
+
+```yaml
+scrape_configs:
+  - job_name: isa-trade
+    scrape_interval: 15s
+    static_configs:
+      - targets: ["localhost:18790"]
+```
+
+Load the alerting rules:
+
+```yaml
+rule_files:
+  - /path/to/isA_Trade/deployment/prometheus/alerts.yml
+```
+
+Monitor key metrics during operation:
+
+```bash
+# Watch live metrics
+watch -n 5 'curl -s http://localhost:18790/metrics | grep -E "isa_trade_(http_requests|agent_invocation|order_latency)"'
+```
+
+## Load Testing
+
+isA Trade includes a Locust-based load testing framework for benchmarking API performance under concurrent user load. The test file lives at `tests/load/locustfile.py`.
+
+### Setup
+
+```bash
+# Install dev dependencies (includes locust)
+pip install -e ".[dev]"
+
+# Start infrastructure and orchestrator
+make docker-up
+make run-local
+```
+
+### Running Load Tests
+
+```bash
+# Quick run: 10 users, ramp 2/sec, 60 second duration
+make load-test
+
+# Interactive mode with Locust web UI
+locust -f tests/load/locustfile.py
+
+# Headless with custom parameters
+locust -f tests/load/locustfile.py --headless \
+  -u 50 -r 5 -t 300s \
+  --csv=results/load-test \
+  --html=results/load-test-report.html
+
+# Target a different environment
+TARGET_HOST=http://staging:18790 locust -f tests/load/locustfile.py --headless -u 20 -r 5 -t 120s
+```
+
+| Flag | Description | Default |
+|------|-------------|---------|
+| `-u` | Total concurrent users | 10 |
+| `-r` | User spawn rate per second | 2 |
+| `-t` | Test duration | 60s |
+| `--csv` | Export CSV results to path | -- |
+| `--html` | Export HTML report to path | -- |
+
+### Test Scenarios
+
+The Locust test simulates realistic traffic with weighted endpoint distribution:
+
+| Endpoint | Method | Weight | Description |
+|----------|--------|--------|-------------|
+| `/health` | GET | 5 | Health check (baseline latency) |
+| `/ready` | GET | 2 | Readiness probe |
+| `/api/v1/portfolio` | GET | 3 | Portfolio state |
+| `/api/v1/portfolio/risk` | GET | 2 | Risk metrics |
+| `/api/v1/capabilities` | GET | 1 | Capabilities listing |
+| `/api/v1/analyze` (equity) | POST | 10 | Full analysis for equity symbols |
+| `/api/v1/analyze` (crypto) | POST | 3 | Full analysis for crypto symbols |
+| `/api/v1/analyze` (tech-only) | POST | 2 | Technical-only analysis |
+| `/api/v1/pipeline` | POST | 5 | Full multi-agent pipeline execution |
+| `/api/v1/trades` | GET | 1 | Trade history |
+| `/status` | GET | 1 | System status |
+
+### Performance Baselines
+
+Track these metrics across load test runs to detect regressions:
+
+| Metric | Target |
+|--------|--------|
+| Requests/sec (avg) | Record per environment |
+| Failure rate | < 1% |
+| p50 latency (ms) | Record per endpoint |
+| p95 latency (ms) | Record per endpoint |
+| p99 latency (ms) | Record per endpoint |
+
+### Known Bottlenecks
+
+1. **Agent analysis latency** -- `/api/v1/analyze` and `/api/v1/pipeline` invoke LLM calls via the SwarmOrchestrator. Latency is dominated by external LLM API calls, not application code.
+2. **Sequential pipeline stages** -- `/api/v1/pipeline` runs agents sequentially (research, technical, risk). Prefer `/api/v1/analyze` for latency-sensitive paths where agents run in parallel via DAG.
+3. **No connection pooling for external APIs** -- Each agent call creates independent HTTP connections to LLM providers, which may exhaust connection limits under high concurrency.
+
+## Security Scanning
+
+isA Trade integrates Trivy container vulnerability scanning into its CI pipeline. Every Docker image is scanned before it can be pushed to the container registry.
+
+### How It Works
+
+The CI workflow (`.github/workflows/ci.yml`) runs Trivy after each Docker build:
+
+1. **Build** -- Docker image is built from `deployment/docker/Dockerfile` and tagged with the version and `latest`.
+2. **Scan** -- Trivy scans the image for `CRITICAL` and `HIGH` severity vulnerabilities. Unfixed vulnerabilities are ignored.
+3. **Gate** -- If Trivy finds any fixable CRITICAL or HIGH vulnerability, the CI pipeline **fails** (`exit-code: 1`), blocking the image push.
+4. **Report** -- Results are uploaded as a SARIF file to GitHub Code Scanning and as a build artifact (retained for 30 days).
+
+### Configuration
+
+| Setting | Value |
+|---------|-------|
+| Severity filter | `CRITICAL,HIGH` |
+| Exit code on findings | `1` (pipeline fails) |
+| Ignore unfixed | `true` |
+| Output format | SARIF |
+| Results retention | 30 days |
+
+### Viewing Results
+
+- **GitHub Security tab** -- Trivy SARIF results appear under Code Scanning alerts in the repository's Security tab.
+- **CI artifacts** -- Download the `trivy-scan-results` artifact from any CI run to inspect the raw SARIF output.
+
 ## Data Sources
 
 | Source | Data |
