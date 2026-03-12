@@ -162,6 +162,237 @@ curl -X POST "http://localhost:8230/api/v1/events" \
 | `payment` | created, succeeded, failed |
 | `storage` | upload, download, delete |
 
+## Observability & Operational Infrastructure
+
+All 35 isA_user microservices share a common operational stack provided by modules in `core/`. This includes Prometheus metrics, graceful shutdown, rate limiting, circuit breakers, and health checks.
+
+### Prometheus Metrics
+
+Every service exposes a `/metrics` endpoint in Prometheus exposition format. Metrics are enabled with a single call to `setup_metrics()` during app startup, which delegates to `isa_common.setup_observability()` for a standardized three-pillar setup:
+
+- **Prometheus metrics** served at `/metrics`
+- **OpenTelemetry tracing** exported to Tempo
+- **Structured logging** shipped to Loki
+
+```python
+from core.metrics import setup_metrics
+
+app = FastAPI(...)
+setup_metrics(app, "task_service", version="1.2.0")
+```
+
+#### Scrape configuration
+
+Point your Prometheus scrape config at each service's `/metrics` path. Health and readiness paths (`/health`, `/health/detailed`, `/metrics`, `/ready`, `/live`) are excluded from request instrumentation to avoid noise.
+
+```yaml
+# prometheus.yml snippet
+scrape_configs:
+  - job_name: "isa_user_services"
+    static_configs:
+      - targets:
+          - "localhost:8201"   # account_service
+          - "localhost:8202"   # auth_service
+          # ... all 35 services
+    metrics_path: /metrics
+    scrape_interval: 15s
+```
+
+#### Domain-specific metrics
+
+In addition to default HTTP request metrics, `core/metrics.py` exposes domain counters:
+
+| Metric | Type | Labels | Description |
+|--------|------|--------|-------------|
+| `auth_failures_total` | Counter | `service`, `method` | Authentication failure count |
+| `business_operations_total` | Counter | `service`, `operation`, `status` | Domain-specific operation tracking |
+| `http_request_content_length_bytes` | Histogram | `service` | Request payload size distribution (buckets: 100 B to 1 MB) |
+
+### Graceful SIGTERM Shutdown
+
+Each service uses the `GracefulShutdown` manager from `core/graceful_shutdown.py`. When a SIGTERM or SIGINT signal arrives, the shutdown sequence is:
+
+1. **Deregister from Consul** -- the service removes itself from the service registry so load balancers stop routing new traffic to this instance.
+2. **Reject new requests** -- the shutdown middleware returns `503 Service Unavailable` with a JSON body for any non-health request.
+3. **Drain in-flight requests** -- the manager waits up to the configured grace period (default 30 seconds) for active requests to complete.
+4. **Run cleanup callbacks** -- registered cleanups (NATS connections, database pools, etc.) execute in registration order, each with a 5-second timeout.
+5. **Exit** -- the process terminates cleanly.
+
+```python
+from core.graceful_shutdown import GracefulShutdown, shutdown_middleware
+
+shutdown_manager = GracefulShutdown("account_service", grace_period=30.0)
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    shutdown_manager.install_signal_handlers()
+    # ... startup: register cleanups ...
+    shutdown_manager.add_cleanup("nats", event_bus.close)
+    shutdown_manager.add_cleanup("postgres", db.close)
+    yield
+    shutdown_manager.initiate_shutdown()
+    await shutdown_manager.wait_for_drain()
+    await shutdown_manager.run_cleanups()
+
+app = FastAPI(lifespan=lifespan)
+app.add_middleware(shutdown_middleware, shutdown_manager=shutdown_manager)
+```
+
+During shutdown, health endpoints (`/health`, `/health/detailed`) continue to respond so orchestrators can distinguish between a graceful drain and a crash.
+
+### Rate Limiting
+
+The `RateLimitMiddleware` from `core/rate_limiter.py` implements a sliding-window counter algorithm with two pluggable backends:
+
+| Backend | Use case |
+|---------|----------|
+| `InMemoryBackend` | Single-process deployments (default) |
+| `RedisBackend` | Multi-process / distributed deployments |
+
+#### Configuration
+
+Rate limits are set per-path, with a default fallback. The middleware is added as standard Starlette middleware:
+
+```python
+from core.rate_limiter import RateLimitConfig, RateLimitMiddleware
+
+app.add_middleware(
+    RateLimitMiddleware,
+    default_limit=RateLimitConfig(requests=60, window_seconds=60),
+    path_limits={
+        "/api/v1/auth/login": RateLimitConfig(requests=20, window_seconds=60),
+        "/api/v1/auth/token": RateLimitConfig(requests=20, window_seconds=60),
+        "/api/v1/auth/register": RateLimitConfig(requests=10, window_seconds=60),
+    },
+)
+```
+
+#### Response headers
+
+Every response includes rate-limit headers:
+
+| Header | Description |
+|--------|-------------|
+| `X-RateLimit-Limit` | Maximum requests allowed in the window |
+| `X-RateLimit-Remaining` | Requests remaining in the current window |
+| `Retry-After` | Seconds to wait before retrying (only on 429) |
+
+When the limit is exceeded, the service returns `429 Too Many Requests` with a JSON body:
+
+```json
+{
+  "error": "Rate limit exceeded",
+  "retry_after": 60
+}
+```
+
+The following paths are never rate-limited: `/health`, `/docs`, `/redoc`, `/openapi.json`, `/info`.
+
+### Circuit Breaker
+
+Inter-service HTTP calls are protected by a per-target circuit breaker (`core/circuit_breaker.py`). The breaker follows the standard three-state model:
+
+```
+CLOSED  ──(failures >= threshold)──>  OPEN
+OPEN    ──(recovery_timeout elapsed)──>  HALF_OPEN
+HALF_OPEN  ──(probe succeeds)──>  CLOSED
+HALF_OPEN  ──(probe fails)──>  OPEN
+```
+
+#### Default parameters
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `failure_threshold` | 5 | Consecutive failures before opening |
+| `recovery_timeout` | 30 s | Time in OPEN state before allowing a probe |
+| `half_open_max_calls` | 1 | Probe calls allowed in HALF_OPEN state |
+
+#### Usage in service clients
+
+```python
+from core.circuit_breaker import CircuitBreaker, CircuitBreakerOpen
+
+cb = CircuitBreaker(name="account_service", failure_threshold=5)
+
+try:
+    cb.check()  # raises CircuitBreakerOpen if circuit is open
+    response = await client.get("/api/v1/accounts/123")
+    if response.status_code >= 500:
+        cb.record_failure()
+    else:
+        cb.record_success()
+except CircuitBreakerOpen as e:
+    # fail fast -- return cached/fallback response
+    logger.warning(f"Circuit open: {e}")
+except (httpx.ConnectError, httpx.TimeoutException):
+    cb.record_failure()
+    raise
+```
+
+When the circuit is open, `CircuitBreakerOpen` is raised immediately without making a network call, preventing cascading failures across the service mesh.
+
+#### Observability
+
+Each breaker exposes a `.metrics()` method returning its current state and counters, which can be wired into Prometheus gauges or logged for alerting:
+
+```python
+cb.metrics()
+# {"name": "account_service", "state": "closed", "failure_count": 0, "success_count": 42}
+```
+
+### Health Check Endpoints
+
+All services expose three health endpoints:
+
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /health` | Quick liveness check -- returns `{"status": "healthy"}` |
+| `GET /health/detailed` | Comprehensive report with dependency status, uptime, and response times |
+| `GET /ready` | Readiness probe for Kubernetes (same contract as `/health`) |
+
+#### Detailed health report
+
+The `ServiceHealthChecker` from `core/health_checker.py` aggregates dependency status into an overall report:
+
+```bash
+curl http://localhost:8202/health/detailed
+```
+
+```json
+{
+  "service_name": "auth_service",
+  "overall_status": "healthy",
+  "version": "1.0.0",
+  "uptime": 86400.5,
+  "dependencies": {
+    "database": {
+      "status": "healthy",
+      "response_time_ms": 1.23,
+      "error_message": null
+    },
+    "consul": {
+      "status": "healthy",
+      "response_time_ms": 0.8,
+      "error_message": null
+    }
+  },
+  "metrics": {
+    "uptime_seconds": 86400.5,
+    "dependency_count": 2,
+    "healthy_dependencies": 2,
+    "degraded_dependencies": 0,
+    "unhealthy_dependencies": 0,
+    "average_response_time": 1.02
+  }
+}
+```
+
+The overall status is derived from dependency health: if any **critical** dependency is unhealthy, the overall status is `unhealthy`; if degraded, it is `degraded`. Non-critical dependencies (e.g., Consul) do not affect the overall status. Dependency checks are cached for 30 seconds to avoid excessive probing.
+
+#### Consul TTL integration
+
+Services register with Consul using TTL-based health checks. The `ConsulRegistry` sends periodic heartbeats, and on shutdown the service deregisters itself so Consul immediately marks the instance as unavailable.
+
 ## Next Steps
 
 - [Commerce](./commerce) - Orders & products
