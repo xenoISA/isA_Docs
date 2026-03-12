@@ -35,6 +35,29 @@ How the isA platform components work together.
 └──────────────────────┘  └──────────────────────┘  └──────────────────────┘
                     │                   │                   │
                     └───────────────────┼───────────────────┘
+                                        │
+                    ┌───────────────────┼───────────────────┐
+                    ▼                                       ▼
+┌──────────────────────────────────┐  ┌──────────────────────────────────┐
+│        DOMAIN SERVICES           │  │       PLATFORM TOOLING           │
+│                                  │  │                                  │
+│  ┌──────────────┐ ┌───────────┐ │  │  ┌──────────────────────┐       │
+│  │   Creative   │ │ Marketing │ │  │  │     Orchestration    │       │
+│  │              │ │           │ │  │  │      (isA Orch)      │       │
+│  │ • Content    │ │ • Campaign│ │  │  │                      │       │
+│  │   Creator    │ │   Manager │ │  │  │ • Unified Code Index │       │
+│  │ • Visual     │ │ • SEO     │ │  │  │ • Project Registry   │       │
+│  │   Designer   │ │   Agent   │ │  │  │ • Impact Analysis    │       │
+│  │ • Brand      │ │ • Content │ │  │  │ • Cross-Project      │       │
+│  │   Strategist │ │   Agent   │ │  │  │   Search             │       │
+│  │ • Copy Editor│ │ • Audience│ │  │  └──────────────────────┘       │
+│  │ • DAM Manager│ │   Insights│ │  │                                  │
+│  │ • Design     │ │ • Campaign│ │  │                                  │
+│  │   System     │ │   Analyst │ │  │                                  │
+│  └──────────────┘ └───────────┘ │  │                                  │
+└──────────────────────────────────┘  └──────────────────────────────────┘
+                    │                                       │
+                    └───────────────────┬───────────────────┘
                                         ▼
 ┌─────────────────────────────────────────────────────────────────────────────────┐
 │                              DATA SERVICE                                        │
@@ -135,6 +158,49 @@ Unified LLM gateway with intelligent routing:
 | **AI** | memory (cognitive memory system) |
 
 [User Services Documentation →](/user)
+
+### Creative Service
+
+AI-powered creative agents for content production and brand management:
+
+| Agent | Purpose |
+|-------|---------|
+| **Content Creator** | Generates written content (articles, posts, scripts) |
+| **Visual Designer** | Produces visual assets and design concepts |
+| **Brand Strategist** | Maintains brand voice and positioning |
+| **Copy Editor** | Reviews and refines content for quality |
+| **DAM Manager** | Digital asset management and organization |
+| **Design System Agent** | Enforces design system consistency |
+
+[Creative Documentation →](/creative)
+
+### Marketing Service
+
+AI-driven marketing automation and analytics:
+
+| Agent | Purpose |
+|-------|---------|
+| **Campaign Manager** | Plans and executes marketing campaigns |
+| **SEO Agent** | Search engine optimization and keyword strategy |
+| **Content Agent** | Marketing-specific content generation |
+| **Audience Insights** | Audience segmentation and analysis |
+| **Campaign Analyst** | Campaign performance analytics and reporting |
+| **Compliance Agent** | Ensures marketing content meets regulations |
+| **Report Generator** | Automated marketing reports and dashboards |
+
+[Marketing Documentation →](/marketing)
+
+### Orchestration (isA Orch)
+
+Platform-level tooling for cross-project operations:
+
+| Component | Purpose |
+|-----------|---------|
+| **Unified Code Index** | Single index spanning all isA projects with symbol resolution |
+| **Project Registry** | Configuration and relationships of all sub-projects |
+| **Platform CLI** | Cross-project indexing, search, and impact analysis |
+
+[Orchestration Documentation →](/orch)
 
 ### Data Service
 
