@@ -166,6 +166,115 @@ curl -X POST http://localhost:8082/api/v1/invoke/v2 \
 
 Resolution priority: explicit model/provider → role lookup → capability filter → service type defaults.
 
+### Latency-Aware Ranking
+
+When multiple candidate models match a request (e.g., several models share the same capability), the router ranks them using a **weighted composite score** that balances cost and recent latency performance.
+
+**Composite score formula:**
+
+```
+score = (1 - latency_weight) * normalized_cost + latency_weight * normalized_latency
+```
+
+- `normalized_cost` — per-token output cost scaled to `[0, 1]` across candidates.
+- `normalized_latency` — provider P50 latency scaled to `[0, 1]` across candidates.
+- The candidate with the **lowest** composite score wins.
+
+When no latency data is available (cold start or new provider), the ranker falls back to cost-only sorting automatically.
+
+**Example request with latency preference:**
+
+```bash
+curl -X POST http://localhost:8082/api/v1/invoke/v2 \
+  -H "Content-Type: application/json" \
+  -d '{
+    "role": "coding",
+    "messages": [{"role": "user", "content": "Refactor this function"}],
+    "preferred_max_cost_per_token": 0.0001,
+    "preferred_max_latency_ms": 500
+  }'
+```
+
+### Per-Provider Latency Tracking
+
+The Model service maintains a **sliding-window latency tracker** for every provider. Each completed inference request records its response latency, and the tracker computes percentile statistics on demand.
+
+**Tracked percentiles:**
+
+| Metric | Description |
+|--------|-------------|
+| `p50_ms` | Median latency — typical response time |
+| `p95_ms` | 95th percentile — tail latency for most requests |
+| `p99_ms` | 99th percentile — worst-case latency |
+| `avg_ms` | Arithmetic mean across the window |
+| `sample_count` | Number of measurements in the current window |
+
+**How data flows:**
+
+1. Every inference call records `latency_ms` for the provider that served it.
+2. Measurements are stored in a per-provider sliding window (default: last 1,000 requests).
+3. The latency ranker reads **P50** from the tracker when scoring candidates.
+4. A **NATS telemetry event** (`isa.model.selection`) is published for each selection decision, including the observed latency and chosen strategy. NATS failures never block inference.
+
+**Querying latency stats:**
+
+Provider latency percentiles are exposed through the health/stats endpoint and can also be queried programmatically:
+
+```python
+from isa_model.serving.api.provider_latency import get_latency_tracker
+
+tracker = get_latency_tracker()
+
+# Get percentiles for a single provider
+openai_stats = tracker.get_percentiles("openai")
+print(f"OpenAI P50={openai_stats.p50_ms}ms  P95={openai_stats.p95_ms}ms  P99={openai_stats.p99_ms}ms")
+
+# Get percentiles for all tracked providers
+all_stats = tracker.get_all_percentiles()
+for provider, stats in all_stats.items():
+    print(f"{provider}: P50={stats.p50_ms}ms ({stats.sample_count} samples)")
+```
+
+### Selection Statistics
+
+The Model service also collects aggregate selection statistics that reveal routing patterns over time:
+
+| Statistic | Description |
+|-----------|-------------|
+| `total_selections` | Total model selection events since startup |
+| `strategy_distribution` | Breakdown by strategy (explicit, role, intelligent, default) with counts and percentages |
+| `top_models` | Most frequently selected models |
+| `avg_latency_ms` | Average selection latency across all events |
+| `selections_by_provider` | Selection count per provider |
+
+These statistics are available via the `/api/v1/models/selection/stats` endpoint.
+
+### Tuning Guide
+
+Control latency-aware routing behavior with these environment variables:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `LATENCY_RANKING_WEIGHT` | `0.3` | Weight given to latency in the composite score. `0.0` = cost-only ranking, `1.0` = latency-only ranking. Values are clamped to `[0.0, 1.0]`. |
+| `LATENCY_WINDOW_SIZE` | `1000` | Number of recent measurements kept per provider. Larger windows produce more stable percentiles but react slower to changes. |
+
+**Tuning recommendations:**
+
+| Scenario | Recommended `LATENCY_RANKING_WEIGHT` | Rationale |
+|----------|--------------------------------------|-----------|
+| Cost-sensitive batch workloads | `0.0` – `0.1` | Minimize spend; latency is not critical |
+| Balanced interactive use (default) | `0.3` | Good trade-off for chat and coding assistants |
+| Real-time / low-latency APIs | `0.6` – `0.8` | Prioritize fast responses over cost savings |
+| Latency-critical pipelines | `0.9` – `1.0` | Always pick the fastest provider regardless of cost |
+
+**Window size guidance:**
+
+- **100** — Reacts quickly to provider degradation; noisier percentiles.
+- **1,000** (default) — Stable percentiles with reasonable responsiveness.
+- **5,000+** — Very smooth percentiles; slow to reflect sudden latency spikes.
+
+For production deployments, monitor P95 and P99 through the Grafana SLO dashboard (`deployment/monitoring/grafana-slo-dashboard.json`) and adjust the weight if a provider consistently exceeds latency SLOs.
+
 ## Voice Session Example
 
 ```bash
