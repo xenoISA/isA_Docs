@@ -16,17 +16,235 @@ All notable changes to the isA platform.
 - Loop detection for stuck agents (#104)
 - Runtime observability with Prometheus metrics and structured logging (#103)
 
+#### Model Service
+- One-click deploy fine-tuned model to Ollama (#198, #266)
+- Fine-tuned model checkpoint registry (#197, #265)
+- Fine-tune job endpoint with async execution (#196, #264)
+- Dataset upload and management API (#195, #263)
+- LoRA SFT algorithm using peft/trl (#194, #262)
+- Latency-aware model ranking in router (#261)
+- Model selection stats collector and telemetry events to NATS (#256, #260)
+- Per-provider latency tracking with percentiles (#257)
+- Local model benchmarking on first pull (#254)
+- Cache warming for high-frequency queries (#253)
+- Semantic cache migration from Redis brute-force to Qdrant vector search (#252)
+- Runtime adapter abstraction for pluggable deployment (#234, #251)
+- Training GPU isolation with preemptible allocations (#232, #250)
+- GPU monitoring service for status, allocations, and plan preview (#233, #249)
+- CLOUD provider consolidation with sub-provider routing (#231, #248)
+- Thinking mode control for reasoning models (#235, #247)
+- Triton multi-model co-location for CV workloads (#229, #246)
+- Deployment Planner for auto engine/GPU/TP decisions (#230, #245)
+- ISA backend auto-routing with fallback chain (#227, #244)
+- CapabilityRegistry for multi-capability model sharing (#243)
+- SGLang adapter and engine instance management with TP support (#242)
+- Model Lifecycle Manager with tiered loading and LRU eviction (#241)
+- GPU Allocator with VRAM-aware placement and MoE support (#225, #240)
+- GPU Discovery Service for auto-detecting GPUs and topology (#224, #239)
+- LOCAL_GPU backend type for on-prem GPU inference (#223, #238)
+- Provider consolidation to ISA + CLOUD (#222, #237)
+
+#### MCP
+- `list_user_files` MCP tool wrapping storage service (#280, #281)
+- Health failure persistence and `reconnect_server` tool (#273, #274, #277)
+- Connection event tracking and history MCP tools (#271, #272, #276)
+- 5 MCP tools for aggregator observability (#270, #275)
+- SHA256 integrity, script gating, lock file, and per-skill config (#261-#265, #268)
+- Skill upgrade with automatic rollback (#260, #267)
+- Skill enable/disable toggle and dry-run install preview (#259, #264, #266)
+- InternalTool data class with format translators (#235-#237, #238)
+- Cursor-based pagination for resource, prompt, session, and tool discovery (#231-#233)
+- Resource update notifications on catalog changes (#215, #222)
+- Weak reference cleanup for session disconnect (#216, #221)
+- Resource subscription registry with subscribe/unsubscribe handlers (#212-#214, #218-#220)
+- Category-based prompt injection detection (#210)
+- Security scanning engine for skills (#183, #209)
+- Trust level system with security scoring (#202-#207)
+- Skill publisher profiles and download counter (#198-#200)
+- Error handler, rate limiting, health checks, API version header (#245-#251, #254)
+- Request timeout middleware, graceful shutdown, and L5 smoke tests (#253)
+
+#### Trade
+- Locust load test and performance baseline (#171, #188)
+- Kustomize overlays for staging and production (#189)
+- Redis AOF persistence for production (#176, #191)
+- Prometheus alerting rules and Trivy container scanning (#167, #168, #186)
+- Versioned GHCR push and live trading approval gate (#183)
+- Database connection resilience with retry (#182)
+- AGENT_PROVIDER env var for subscription proxy support (#195)
+
+#### Cloud
+- Backup/restore scripts for NATS, Consul KV, and MQTT (#116)
+- PodDisruptionBudget template for isa-service Helm chart (#115)
+- Observability env vars in Helm chart and scrape targets (#102, #113)
+- PostgreSQL backup CronJob for production (#69, #105)
+- Vault + External Secrets Operator for production secret management (#67, #100)
+- Consul watch for near-instant APISIX route sync (#99)
+- Unit tests for tracing and observability modules (#97, #103, #104)
+- Unit tests for shared Prometheus metrics client (#101)
+
+#### Mate
+- A2A delegation team for dev workflows via isa-vibe (#176)
+- Unified AI access into single onboarding step (#174)
+- Multi-user credential routing with BYOK and isA Subscription (#171, #172)
+- Credential validation, CLI, onboarding, mode switching, and audit logging (#172)
+- OAuth transport for codex-sub and anthropic-sub providers
+- Mate persona, skill injection, and expanded tool list (#146, #150)
+- Skill Registry API with CRUD endpoints for community skills (#91, #115)
+- Skill publishing pipeline with security scanning (#116)
+- Skill install, list, remove, search, browse, update, and connect CLI commands (#117-#123)
+- Signal, Microsoft Teams, and Matrix channel adapters (#104)
+- Docker quickstart and onboarding docs refresh (#89, #90, #108)
+
+#### Console
+- SWR migration, console cleanup, and loading states (#62)
+- Vitest + RTL test framework with L1/L2 tests (#61)
+- Production Dockerfile (#58)
+- Security headers in Next.js config (#57)
+- Error boundaries and error UI for dashboard (#56)
+- Next.js middleware for server-side auth protection (#55)
+- SkillCategory/GuidanceSkill types and useAgentResources hook (#36)
+
+#### User Services
+- Prometheus /metrics endpoints for all 35 services (#107)
+- Graceful SIGTERM shutdown handlers for all services (#103)
+- Rate limiting middleware and circuit breaker pattern (#101)
+- Inter-service clients for inventory, tax, fulfillment (#105)
+- Missing billing endpoints for quota and records (#104)
+- Alembic database migration framework (#99)
+- Service layers for inventory, tax, fulfillment (#83)
+- Metrics migration to isa_common shared observability clients (#110)
+
+#### Creative (new project)
+- DAM Manager with bulk operations and expiration policies (#45, #60)
+- Malware scanning in asset ingestion pipeline (#46, #61)
+- Real brand compliance checking in Visual Designer (#44, #59)
+- Multi-variation content generation with scoring and selection (#28, #34)
+- Real tool integrations for generate_image and apply_layout (#25, #33)
+- Checkpoint/restore for workflow execution loop (#32)
+- WorkflowStore abstraction for persistent workflow storage (#31)
+- Design System Agent veto power through shared state (#5, #14)
+- DAG-based wavefront execution with parallel steps (#13)
+- Shared state model with field ownership (#12)
+- SwarmOrchestrator with in-process agents (#11)
+- Circuit breaker pattern and JWT authentication (#42, #43, #49)
+- Per-client rate limiting with 429 responses (#30, #38)
+- Prometheus metrics instrumentation and /metrics endpoint (#35)
+- SDK multi-agent workflow primitives (#23, #36)
+
+#### Marketing (new project)
+- 8-agent architecture with Content, SEO, Campaign, and Compliance agents (#18, #43)
+- A2A endpoints for campaign analyst and SEO agents (#39)
+- Shared state through pipeline with STATE_FIELD_OWNERS pattern (#4, #35)
+- In-process SwarmOrchestrator pipeline replacing HTTP microservices (#36)
+- Single-container architecture consolidating 8 agent containers (#5, #7, #40)
+- Orchestrator multi-agent scenario and integration tests
+
+#### Orchestrator (new project)
+- Platform CLI with index, search, impact, and stats commands (#15)
+- Cross-project edge resolution with same-project preference (#13)
+- Multi-project indexing loop (#12)
+- Project registry loader from config/projects.yaml (#11)
+- Tree-sitter parsing for TypeScript and JavaScript (#17)
+- Tier 2 local embedding index for semantic code search (#16)
+- Project-scoped query API with get_symbols method (#14)
+- TDD test-layer routing and upgrade skills for full pyramid (#26)
+- Project context detection and test directory scaffolding (#27)
+
+#### Vibe
+- Provider-aware model defaults for codex-sub support (#146)
+- Global preference persistence and memory CLI subcommand (#138)
+- Lazy skill loading and ops-to-product feedback loop (#137)
+- Codebase intelligence tools and handoff notes (#136)
+- Human-in-the-loop pause wired into streaming with --quiet flag (#135)
+- Inter-agent handoff notes, requests, and streaming UX (#134)
+- Session listing via workflow list command (#132)
+- --resume CLI flag for session resume (#114, #131)
+- SharedState injection into sub-agent prompts for cross-team context (#129)
+- Session metadata persistence and memory injection ordering (#123)
+
 #### OS Services
 - Pool Manager executor state persistence across restarts (#95-#100)
-- Code deployment subsystem merged into Pool Manager (#101)
+- Code deployment subsystem merged into Pool Manager (#101, #106)
 - Tiered compute pricing plans (#74)
 - Volume mount and network_mode support for Cloud OS backends (#94)
+- WebSocket streaming and security API routes for cloud_os (#116)
+- Dockerfile, Helm values, and env configs for desktop_os (#141)
+- GitHub Actions CI/CD pipeline for all services (#136)
+- Metrics migration to isa_common shared observability clients (#138)
 
 ### Fixed
 
 #### Agent SDK
 - PoolManagerClient endpoint and payload inconsistency (#114)
 - Stripped OPENAI_API_KEY from subprocess environments (#125)
+
+#### Model Service
+- Clarified embedding service stubs as rerank-only (#259)
+- Cleaned up test artifacts and moved misplaced test files (#258)
+
+#### MCP
+- Skill search AttributeError and cache reload after install (#257)
+
+#### Trade
+- Require actual credentials before starting streaming feeds (#199)
+- Async test helpers using new_event_loop() to prevent suite-wide failures (#193)
+- A2A agent card URLs using 127.0.0.1 instead of localhost (#192)
+- K8s image tag updates and README/SECURITY/CHANGELOG additions (#173-#175, #184)
+
+#### Cloud
+- Client bugs in MinIO typo, path traversal, deprecated datetime, thread cleanup (#125)
+- CI security scans made blocking by removing continue-on-error (#114)
+- State mutation fix with observability tests and scrape targets (#113)
+- Default registry fallback when custom registry is None in metrics client
+
+#### Mate
+- Local user bypass removed so all BYOK users can use credentials (#173)
+- Unified proxy port mismatch and GPT model upgrade (#145)
+- Route default chat through runtime agent for local tool access
+- Pre-warm SDK context at gateway startup to eliminate first-query delay (#144)
+- A2A team URLs using 127.0.0.1 and isa_vibe timeout increase (#178)
+
+#### Console
+- Auth token propagation to all SDK service instances (#60)
+- Consistent getCurrentToken() across all admin services (#59)
+- P3 backlog fixes for errors, chart, auth context, and URLs (#35)
+- Non-functional settings controls disabled with coming-soon indicators (#34)
+- Error states on analytics, MCP prompts, and main dashboard (#33)
+- Service error propagation to UI instead of swallowing (#32)
+
+#### User Services
+- Consul deregistration before rejecting requests during shutdown (#109)
+- Production readiness fixes for async-safe singletons, Helm tags, and service CORS (#100)
+- Stub health check DB probe replaced with real SELECT 1 query (#97)
+- Commerce services added to Helm manifests and deploy scripts (#96)
+
+#### Creative
+- Stale imports, API test mismatches, and Pydantic V2 warnings (#19)
+- A2A port standardization to 18791 with 127.0.0.1 (#55)
+- Visual designer test imports to match actual function names (#56)
+- Missing Pillow dependency (#62)
+
+#### Marketing
+- Stale port references and docs update for single-container architecture (#58)
+- Dead specialist main.py files and deprecated agent_client.py removal (#57)
+- Missing logging module (#55)
+- Stale unit tests for non-existent base_agent and Config (#46, #52)
+- A2A URLs using 127.0.0.1 instead of localhost (#51)
+- Empty contracts and report generator tool name alignment (#22)
+
+#### Vibe
+- Proxy reuse, model tier resolution, and streaming deduplication (#148)
+- Streaming output duplication and Redis TTL persistence (#141)
+
+#### OS Services
+- Bare except blocks audited and fixed across all services (#143)
+- Missing vm_id field and watchdog restart callbacks wired (#142)
+- All service URLs made env-configurable in desktop_os (#140)
+- cloud_os production code importing from test contracts (#139)
+- Missing prometheus_client dependency for desktop_os (#137)
+- Regional warm pool methods wired into PoolState (#135)
+- 64 test failures and 13 collection errors resolved in desktop_os (#134)
 
 ---
 
