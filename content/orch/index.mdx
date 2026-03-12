@@ -4,11 +4,11 @@ Unified code index and platform intelligence for the isA ecosystem.
 
 ## Overview
 
-isA Orch provides cross-project code intelligence — a single index spanning all 16 isA sub-projects with symbol resolution, call-graph analysis, full-text search, and semantic search. It is the shared intelligence substrate that skills and isa-vibe use for impact analysis, context detection, and TDD routing.
+isA Orch provides cross-project code intelligence — a single index spanning all 19 isA sub-projects with symbol resolution, call-graph analysis, full-text search, and semantic search. It is the shared intelligence substrate that skills and isa-vibe use for impact analysis, context detection, and TDD routing.
 
 | Feature | Detail |
 |---------|--------|
-| **Index** | All 16 isA projects in one SQLite database |
+| **Index** | All 19 isA projects in one SQLite database |
 | **Search** | FTS5 full-text + optional semantic embeddings |
 | **Impact** | Cross-project call-graph analysis (recursive CTE) |
 | **Languages** | Python (AST), TypeScript/JavaScript (tree-sitter) |
@@ -37,7 +37,7 @@ isa-orch stats
 ## Architecture
 
 ```
-config/projects.yaml (16 projects)
+config/projects.yaml (19 projects)
          │
     ProjectRegistry
          │
@@ -50,62 +50,176 @@ config/projects.yaml (16 projects)
 
 **Database**: `~/Documents/Fun/isA/.isa/code_index.db`
 
+The architecture has three layers:
+
+1. **Registry** — `config/projects.yaml` declares every sub-project with its path, language, and GitHub remote. The `ProjectRegistry` loads this file and resolves paths relative to the platform root.
+2. **Indexer** — Walks each project, parses source files with the appropriate parser (Python `ast` for `.py`, tree-sitter for `.ts`/`.js`), extracts symbols (functions, classes, methods, variables), and records edges (calls, imports, inheritance).
+3. **Index** — A single SQLite database with FTS5 full-text search and optional vector embeddings for semantic queries. All symbols carry a `project` tag enabling scoped and cross-project queries.
+
 ## Core Features
 
-### Multi-Project Symbol Index
+### Code Index (Tree-Sitter and AST Parsing)
 
-All symbols across the platform are indexed with project tags, enabling cross-project queries:
+The indexer extracts a complete symbol table from every source file in the platform. Each symbol record includes the qualified name, kind (function, class, method, variable), file path, line range, docstring, and project tag.
+
+**Python** files are parsed with the built-in `ast` module, extracting:
+- Functions and async functions (top-level and nested)
+- Classes and their methods
+- Module-level variables and constants
+- Import relationships and call edges
+
+**TypeScript and JavaScript** files are parsed with [tree-sitter](https://tree-sitter.github.io/tree-sitter/), extracting:
+- Named and default exports
+- Function declarations and arrow functions
+- Class declarations with methods and properties
+- Interface and type alias definitions
+- Import statements and call expressions
+
+The indexer is **incremental** — it checksums every file and only re-parses files that have changed since the last run, making re-indexing fast even across the full platform.
 
 ```bash
-# Search in a specific project
-isa-orch search "tool_node" --project isA_Agent_SDK
+# Full index of all projects
+isa-orch index
 
-# Search by symbol kind
-isa-orch search "ToolNode" --kind class
+# Index a single project
+isa-orch index --project isA_MCP
+
+# Force full re-index (ignore checksums)
+isa-orch index --full
+
+# Index with semantic embeddings
+isa-orch index --embeddings
+```
+
+### Semantic Embedding Index
+
+When the `--embeddings` flag is passed during indexing, isA Orch generates vector embeddings for every symbol using [sentence-transformers](https://www.sbert.net/). This enables **semantic search** — finding symbols by meaning rather than exact text match.
+
+The embedding index uses a local model (no external API calls), so it works fully offline. Embeddings are stored alongside the FTS5 index in the same SQLite database.
+
+Use cases for semantic search:
+- Finding symbols related to a concept ("retry logic", "error handling", "authentication")
+- Discovering similar implementations across projects
+- Locating code relevant to a natural-language description
+
+```bash
+# Index with embeddings (first time takes longer)
+isa-orch index --embeddings
 
 # Semantic search
+isa-orch search "retry logic for failed tool calls" --semantic
+
+# Combine semantic search with project scope
+isa-orch search "authentication middleware" --semantic --project isA_Cloud
+```
+
+### Cross-Project Symbol Search and Resolution
+
+All symbols carry a project tag, enabling both scoped and platform-wide queries. The search engine supports three modes:
+
+**Full-text search (default)** — Uses SQLite FTS5 for fast substring and token matching:
+
+```bash
+# Search across all projects
+isa-orch search "tool_node"
+
+# Search within a specific project
+isa-orch search "tool_node" --project isA_Agent_SDK
+
+# Filter by symbol kind
+isa-orch search "ToolNode" --kind class
+
+# JSON output for machine consumption
+isa-orch search "ToolNode" --json
+```
+
+**Semantic search** — Uses vector embeddings for meaning-based queries:
+
+```bash
 isa-orch search "retry logic" --semantic
 ```
 
-### Cross-Project Impact Analysis
-
-Find all callers of a symbol, recursively across project boundaries:
+**Symbol resolution** — Given a short name, resolves it to all matching qualified names across the platform:
 
 ```bash
-isa-orch impact "ToolNode" --max-depth 3
+# Find all definitions of "ToolNode" across all projects
+isa-orch search "ToolNode" --kind class
+
+# Results show project, qualified name, file, and line range
+# isA_Agent_SDK  isa_agent_sdk.nodes.tool_node.ToolNode  src/nodes/tool_node.py  42-128
+# isA_Agent      isa_agent.tools.ToolNode                src/tools.py            15-67
 ```
 
-Uses a 3-pass edge resolution algorithm:
-1. Exact qualified name match
-2. Short name match within same project
-3. Short name match across all projects
+### Impact Analysis
 
-### Incremental Indexing
+The impact analysis engine traces the call graph of any symbol recursively across project boundaries. Given a symbol name, it returns every caller — direct and transitive — so you can understand the blast radius of a change before making it.
 
-Only re-indexes changed files (checksum-based):
+The algorithm uses a **3-pass edge resolution** strategy:
+1. **Exact qualified name match** — e.g., `isa_agent_sdk.nodes.tool_node.ToolNode`
+2. **Short name match within the same project** — resolves unqualified references within a project
+3. **Short name match across all projects** — catches cross-project usage via re-exports or dynamic imports
 
 ```bash
-# Full index
-isa-orch index
+# Basic impact analysis
+isa-orch impact "ToolNode"
 
-# Single project
-isa-orch index --project isA_MCP
+# With depth control (default is unlimited)
+isa-orch impact "ToolNode" --max-depth 3
 
-# With semantic embeddings
-isa-orch index --embeddings
+# Scoped to a project
+isa-orch impact "ToolNode" --project isA_Agent_SDK
+
+# JSON output for programmatic use
+isa-orch impact "isa_agent_sdk.nodes.tool_node.ToolNode" --json
+```
+
+Example output:
+
+```
+Impact analysis for: ToolNode (max-depth: 3)
+
+Direct callers (depth 1):
+  isA_Agent_SDK  AgentGraph.build()          src/graph.py:87
+  isA_Agent      PlannerAgent._run_tools()   src/agents/planner.py:145
+
+Transitive callers (depth 2):
+  isA_Agent      AgentRunner.execute()       src/runner.py:34
+  isA_Console    CLIHandler.handle_command()  src/cli/handler.ts:78
+
+Transitive callers (depth 3):
+  isA_Console    main()                       src/index.ts:12
+
+Total: 5 callers across 3 projects
+```
+
+### Platform Statistics
+
+Get a high-level view of the index — total symbols, edges, projects, and language breakdown:
+
+```bash
+# Platform-wide stats
+isa-orch stats
+
+# Stats for a single project
+isa-orch stats --project isA_Agent_SDK
+
+# JSON output
+isa-orch stats --json
 ```
 
 ### Project Context Detection
 
-Auto-detects language, framework, test runner, and infrastructure:
+Auto-detects language, framework, test runner, and infrastructure for any project directory:
 
 ```bash
 isa-orch project-context ./isA_Agent_SDK
 ```
 
+This is used internally by skills like `/test` and `/codegen` to adapt their output to the target project's stack.
+
 ### Test Scaffold
 
-Creates 5-layer test directory structure for any project:
+Creates a 5-layer test directory structure following the [TDD standard](/conventions#tdd-standard):
 
 ```bash
 isa-orch test-scaffold ./isA_Agent_SDK
@@ -114,34 +228,59 @@ isa-orch test-scaffold ./isA_Agent_SDK
 
 ## CLI Reference
 
-| Command | Description |
-|---------|-------------|
-| `isa-orch index` | Index all (or `--project`) projects |
-| `isa-orch search <query>` | Full-text search (`--semantic`, `--kind`, `--project`) |
-| `isa-orch impact <symbol>` | Cross-project impact analysis (`--max-depth`) |
-| `isa-orch stats` | Platform-wide index statistics (`--project`) |
-| `isa-orch projects` | List all registered projects |
-| `isa-orch project-context <path>` | Detect project language/framework/infra |
-| `isa-orch test-scaffold <path>` | Create 5-layer test directory structure |
+| Command | Description | Key Flags |
+|---------|-------------|-----------|
+| `isa-orch index` | Index all or selected projects | `--project`, `--full`, `--embeddings` |
+| `isa-orch search <query>` | Full-text or semantic search | `--semantic`, `--kind`, `--project`, `--json` |
+| `isa-orch impact <symbol>` | Cross-project impact analysis | `--max-depth`, `--project`, `--json` |
+| `isa-orch stats` | Platform-wide index statistics | `--project`, `--json` |
+| `isa-orch projects` | List all registered projects | `--json` |
+| `isa-orch project-context <path>` | Detect project language/framework/infra | `--json` |
+| `isa-orch test-scaffold <path>` | Create 5-layer test directory structure | — |
 
 All commands support `--json` for machine-readable output.
 
 ## Project Registry
 
-Projects are declared in `config/projects.yaml`:
+Projects are declared in `config/projects.yaml`. The registry currently tracks 19 sub-projects:
 
 ```yaml
 platform_root: ~/Documents/Fun/isA
 
 projects:
-  isA_Agent_SDK:
-    path: isA_Agent_SDK
+  - name: isA_Agent_SDK
+    description: Core agent framework with LangGraph nodes
     language: python
-  isA_MCP:
-    path: isA_MCP
+    github: xenoISA/isA_Agent_SDK
+
+  - name: isA_MCP
+    description: Tool server with 190+ tools
     language: python
-  # ... all 16 projects
+    github: xenoISA/isA_MCP
+
+  - name: isA_Console
+    description: Console/UI interfaces
+    language: typescript
+    github: xenoISA/isA_Console
+
+  # ... 16 more projects
 ```
+
+Each entry specifies the project name, description, primary language, and GitHub remote. The registry is the single source of truth for which projects exist in the platform and is consumed by the indexer, search engine, and CLI.
+
+## How Skills Use isA Orch
+
+isA Orch is not just a standalone tool — it provides the intelligence layer that other skills and pipelines depend on:
+
+| Skill / Pipeline | How It Uses Orch |
+|------------------|------------------|
+| `/investigate` | Searches the index to find relevant code across all projects |
+| `/design` | Uses impact analysis to assess blast radius of proposed changes |
+| `/fix-issue` | Locates the symbol to fix and checks for cross-project callers |
+| `/test` | Uses project-context detection to pick the right test framework |
+| `/cleanup` | Finds unused symbols by checking for zero callers in the index |
+| `/refactor` | Uses impact analysis to find all references before renaming |
+| `isa-vibe` | Queries the index during CDD and TDD phases for context |
 
 ## Tech Stack
 
