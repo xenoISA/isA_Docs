@@ -6,6 +6,7 @@ const withNextra = nextra({
 })
 
 export default withNextra({
+  basePath: '/docs',
   reactStrictMode: true,
   output: 'standalone',
 })
