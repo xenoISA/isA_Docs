@@ -16,6 +16,7 @@
   "author": "isA Team",
   "license": "MIT",
   "dependencies": {
+    "@isa/ui-web": "link:../isA_App_SDK/packages/ui-web",
     "@tailwindcss/postcss": "^4.1.18",
     "next": "^16.1.5",
     "nextra": "^4.6.1",
