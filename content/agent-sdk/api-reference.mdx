@@ -2,267 +2,191 @@
 
 Complete API reference for the isA Agent SDK.
 
-## Core Functions
+## Agent Class
 
-### `query(prompt, options?)`
-
-Stream agent responses as they arrive.
+The primary interface for creating and running agents.
 
 ```python
-from isa_agent_sdk import query, ISAAgentOptions
+from isa_agent_sdk import Agent
 
-async for msg in query("Explain quantum computing"):
-    if msg.is_text:
-        print(msg.content, end="")
-    elif msg.is_tool_use:
-        print(f"[Tool: {msg.tool_name}]")
+# L1: Zero config
+agent = Agent("assistant")
+
+# L2: Common params
+agent = Agent("coder", tools=["Read", "Write"], model="claude-sonnet")
+
+# L3: Full options
+agent = Agent("expert", options=ISAAgentOptions(
+    mode=ExecutionMode.COLLABORATIVE,
+    guardrail_mode=GuardrailMode.STRICT,
+    max_iterations=50,
+))
 ```
 
-**Parameters:**
+### Methods
 
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `prompt` | `str` | Yes | Natural language prompt |
-| `options` | `ISAAgentOptions` | No | Configuration options |
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `agent.run(message)` | `AgentRunResult` | Send a message and get a complete response |
+| `agent.stream(message)` | `AsyncIterable[AgentMessage]` | Stream events as they arrive |
+| `Agent.auto_team(agents)` | `Agent` | Create a team that auto-selects the best agent |
 
-**Yields:** `AgentMessage` objects in sequence.
+## ISAAgentOptions
 
----
-
-### `ask(prompt, options?)`
-
-Get a single complete response (non-streaming).
+Full configuration for agent behavior.
 
 ```python
-from isa_agent_sdk import ask
-
-result = await ask("What is 2+2?")
-print(result.content)
+from isa_agent_sdk import ISAAgentOptions, ExecutionMode, ToolDiscovery
 ```
 
-**Parameters:**
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `prompt` | `str` | Yes | Natural language prompt |
-| `options` | `ISAAgentOptions` | No | Configuration options |
-
-**Returns:** `AgentMessage` with the complete response.
-
----
-
-### `resume(session_id)`
-
-Resume a previously checkpointed session.
-
-```python
-from isa_agent_sdk import resume
-
-async for msg in resume("my-task-123"):
-    print(msg.content)
-```
-
-**Parameters:**
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `session_id` | `str` | Yes | Session ID to resume |
-
-**Yields:** `AgentMessage` objects continuing from the checkpoint.
-
----
-
-### `execute_tool(name, args)`
-
-Execute a tool directly without agent reasoning.
-
-```python
-from isa_agent_sdk import execute_tool
-
-result = await execute_tool("web_search", {"query": "Python tutorials"})
-print(result)
-```
-
-**Parameters:**
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `name` | `str` | Yes | Tool name |
-| `args` | `dict` | Yes | Tool arguments |
-
-**Returns:** Tool execution result.
-
----
-
-### `get_available_tools(user_query?)`
-
-List tools available to the agent.
-
-```python
-from isa_agent_sdk import get_available_tools
-
-tools = await get_available_tools(user_query="search the web")
-for tool in tools:
-    print(f"{tool.name}: {tool.description}")
-```
-
-**Parameters:**
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `user_query` | `str` | No | Filter tools by relevance to query |
-
-**Returns:** List of available tool descriptors.
-
----
-
-## Classes
-
-### `ISAAgentOptions`
-
-Configuration for agent behavior.
-
-```python
-from isa_agent_sdk import ISAAgentOptions, ExecutionMode, OutputFormat
-
-options = ISAAgentOptions(
-    model="gpt-4.1-nano",
-    allowed_tools=["web_search", "read_file"],
-    max_iterations=30,
-    skills=["code-review", "debug"],
-    execution_mode=ExecutionMode.REACTIVE,
-    session_id="my-session",
-    user_id="user-123",
-)
-```
+### Key Fields
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `model` | `str` | `"gpt-4.1-nano"` | LLM model to use |
-| `allowed_tools` | `list[str]` | `[]` | Permitted tools |
-| `max_iterations` | `int` | `30` | Max reasoning iterations |
-| `skills` | `list[str]` | `[]` | Skills to activate |
-| `execution_mode` | `ExecutionMode` | `REACTIVE` | Execution mode |
-| `session_id` | `str` | Auto-generated | Session identifier |
-| `user_id` | `str` | `None` | User identifier |
-| `env` | `ExecutionEnv` | `SERVER` | Execution environment |
-| `output_format` | `OutputFormat` | `None` | Structured output schema |
+| `model` | `str` | `None` | Model name for reasoning |
+| `system_prompt` | `str` | `None` | System prompt override |
+| `mode` | `ExecutionMode` | `REACTIVE` | Execution mode |
+| `tool_discovery` | `ToolDiscovery` | `HYBRID` | Tool discovery strategy |
+| `permission_mode` | `PermissionMode` | `DEFAULT` | Permission enforcement |
+| `guardrail_mode` | `GuardrailMode` | `MODERATE` | Safety guardrail strictness |
+| `tools` | `list[str]` | `[]` | Tools to make available |
+| `skills` | `list[str]` | `[]` | Skills to enable |
+| `max_iterations` | `int` | `25` | Max agent loop iterations |
+| `temperature` | `float` | `None` | Model temperature |
+| `max_tokens` | `int` | `None` | Max response tokens |
 
-[Full options guide](./options)
+### Enums
 
----
+**ExecutionMode**: `REACTIVE` (default), `COLLABORATIVE`, `PROACTIVE`
 
-### `ISAAgentClient`
+**ToolDiscovery**: `EXPLICIT`, `SEMANTIC`, `HYBRID` (default)
 
-Bidirectional client for multi-turn conversations.
+**PermissionMode**: `DEFAULT`, `ACCEPT_EDITS`, `BYPASS_PERMISSIONS`
+
+**GuardrailMode**: `PERMISSIVE`, `MODERATE` (default), `STRICT`
+
+## AgentMessage
+
+Events emitted during agent execution.
+
+```python
+from isa_agent_sdk import AgentMessage, EventType
+```
+
+### EventType Values
+
+| Event | Description |
+|-------|-------------|
+| `session.created` | New session started |
+| `session.resumed` | Existing session resumed |
+| `content.start` | Response generation started |
+| `content.delta` | Incremental content chunk |
+| `content.complete` | Full response complete |
+| `tool.start` | Tool execution started |
+| `tool.result` | Tool returned a result |
+| `tool.error` | Tool execution failed |
+
+## Tool Definition
+
+Define custom tools for agent use.
+
+```python
+from isa_agent_sdk import tool
+
+@tool()
+async def get_weather(city: str) -> str:
+    """Get current weather for a city."""
+    return f"Weather in {city}: sunny"
+```
+
+Parameters are inferred from type hints. The tool is automatically registered with the MCP server.
+
+## Multi-Agent Orchestration
+
+### Swarm
+
+Dynamic handoff between agents.
+
+```python
+from isa_agent_sdk import SwarmOrchestrator
+
+swarm = SwarmOrchestrator(agents=[researcher, writer])
+result = await swarm.run("Research and write about AI agents")
+```
+
+### Fan Out
+
+Parallel execution across agents.
+
+```python
+from isa_agent_sdk import fan_out
+
+results = await fan_out([analyst, researcher], "Analyze this data")
+```
+
+### Refinement
+
+Iterative improvement loop.
+
+```python
+from isa_agent_sdk import refine
+
+result = await refine(editor, "Write a haiku", max_iterations=3)
+```
+
+## AgentStack
+
+Modular capability layers.
+
+```python
+from isa_agent_sdk import AgentStack
+
+# All stacks enabled (default)
+stack = AgentStack()
+
+# Selective stacks
+stack = AgentStack(enable=["memory", "response"])
+
+await stack.start()
+print(stack.health())
+await stack.stop()
+```
+
+### Stacks
+
+| Stack | Purpose | Optional Deps |
+|-------|---------|---------------|
+| `memory` | 6-type memory system | `persistence` |
+| `events` | NATS + triggers + scheduling | `nats` |
+| `data` | DataMCP tools + analytics | `analytics` |
+| `response` | Structured response envelopes | — |
+| `interaction` | Rich HITL | `voice` |
+| `autonomy` | Self-improvement | — |
+
+## ISAAgentClient
+
+HTTP + SSE client for connecting to deployed agents.
 
 ```python
 from isa_agent_sdk import ISAAgentClient
 
-async with ISAAgentClient() as client:
-    await client.query("Remember the number 42")
-    async for msg in client.receive():
-        print(msg.content)
+client = ISAAgentClient(base_url="http://localhost:8080")
 
-    response = await client.ask("What number did I mention?")
-    print(response.content)
+# Non-streaming
+result = await client.chat.create("Hello", user_id="user-1")
+
+# Streaming
+async for event in client.chat.stream("Hello", user_id="user-1"):
+    print(event.type, event.data)
 ```
 
-| Method | Description |
-|--------|-------------|
-| `query(prompt)` | Send a prompt and stream responses |
-| `receive()` | Async iterator for incoming messages |
-| `ask(prompt)` | Send prompt and get single response |
+## TypeScript SDK
 
-[Agent Client documentation](./agent-client)
+```typescript
+import { Agent, defineTool, swarm } from "@isa-agent/sdk";
 
----
-
-### `ISAAgent`
-
-HTTP client for deployed applications.
-
-```python
-from isa_agent_sdk import ISAAgent
-
-client = ISAAgent(base_url="http://localhost:8000")
-response = client.chat.create(message="Hello!", user_id="user123")
+const agent = new Agent("assistant", { model: "claude-sonnet" });
+const result = await agent.run("Hello!");
 ```
 
-| Method | Description |
-|--------|-------------|
-| `chat.create(message, user_id)` | Single response |
-| `chat.stream(message)` | Streaming response |
-
----
-
-## Message Types
-
-### `AgentMessage`
-
-All responses are delivered as `AgentMessage` objects.
-
-| Property | Type | Description |
-|----------|------|-------------|
-| `content` | `str` | Message content |
-| `type` | `str` | Message type (see below) |
-| `is_text` | `bool` | True for text content |
-| `is_tool_use` | `bool` | True for tool calls |
-| `is_checkpoint` | `bool` | True for checkpoint requests |
-| `tool_name` | `str` | Tool name (if tool use) |
-| `tool_args` | `dict` | Tool arguments (if tool use) |
-| `has_structured_output` | `bool` | True if structured output available |
-
-**Message type values:**
-
-| Type | Description |
-|------|-------------|
-| `text` | Text content |
-| `thinking` | Chain-of-thought reasoning |
-| `tool_use` | Tool being called |
-| `tool_result` | Tool execution result |
-| `checkpoint` | Requires user input |
-| `error` | Error message |
-
----
-
-## Execution Modes
-
-| Mode | Enum | Description |
-|------|------|-------------|
-| Reactive | `ExecutionMode.REACTIVE` | Standard request-response |
-| Collaborative | `ExecutionMode.COLLABORATIVE` | Durable with checkpoints |
-| Proactive | `ExecutionMode.PROACTIVE` | Event-driven autonomous |
-
----
-
-## Error Classes
-
-```python
-from isa_agent_sdk import (
-    ISASDKError,        # Base error
-    ConnectionError,    # Service connection failed
-    ToolExecutionError, # Tool execution failed
-    SessionError,       # Session issues
-    ValidationError,    # Input validation failed
-)
-```
-
-| Error | Properties | Description |
-|-------|-----------|-------------|
-| `ISASDKError` | `message` | Base SDK error |
-| `ConnectionError` | `message`, `url` | Cannot reach service |
-| `ToolExecutionError` | `message`, `tool_name` | Tool failed |
-| `SessionError` | `message`, `session_id` | Session not found or expired |
-| `ValidationError` | `message`, `field` | Invalid input |
-
----
-
-## Environment Variables
-
-| Variable | Description |
-|----------|-------------|
-| `ISA_API_KEY` | API key for isA platform |
-| `ISA_MODEL_URL` | Model service URL |
-| `ISA_MCP_URL` | MCP service URL |
-| `CHECKPOINTER_BACKEND` | Checkpointer backend (`redis`, `filesystem`) |
+See the [TypeScript SDK source](https://github.com/xenoISA/isA_Agent_SDK/tree/main/ts) for full API.
