@@ -1,73 +1,25 @@
 @import "tailwindcss";
+@import "../../node_modules/@isa/ui-web/src/tokens/tokens.css";
 
 /*
- * isA Platform Shared Design Tokens
- *
- * Token names and values are aligned with @isa/theme from isA_App_SDK.
- * When @isa/theme is published as an installable package, these manual
- * definitions can be replaced with:
- *
- *   @import "@isa/theme/css/tokens.css";
- *
- * @see https://github.com/xenoISA/isA_App_SDK/tree/main/packages/theme
+ * isA Docs — Surface-specific overrides
+ * Base tokens imported from @isa/ui-web SDK (tokens.css)
+ * Only Docs/Nextra-specific aliases defined here.
  */
 :root {
-  /* Primary brand colors - Blue */
-  --color-primary-50: #eff6ff;
-  --color-primary-100: #dbeafe;
-  --color-primary-200: #bfdbfe;
-  --color-primary-300: #93c5fd;
-  --color-primary-400: #60a5fa;
-  --color-primary-500: #3b82f6;
-  --color-primary-600: #2563eb;
-  --color-primary-700: #1d4ed8;
-  --color-primary-800: #1e40af;
-  --color-primary-900: #1e3a8a;
-  --color-primary-950: #172554;
-
-  /* Semantic colors */
-  --color-success-50: #ecfdf5;
-  --color-success-500: #10b981;
-  --color-success-600: #059669;
-
-  --color-warning-50: #fffbeb;
-  --color-warning-500: #f59e0b;
-  --color-warning-600: #d97706;
-
-  --color-error-50: #fef2f2;
-  --color-error-500: #ef4444;
-  --color-error-600: #dc2626;
-
-  --color-info-50: #eff6ff;
-  --color-info-500: #3b82f6;
-  --color-info-600: #2563eb;
-
-  /* Neutral grays */
-  --color-gray-50: #f9fafb;
-  --color-gray-100: #f3f4f6;
-  --color-gray-200: #e5e7eb;
-  --color-gray-300: #d1d5db;
-  --color-gray-400: #9ca3af;
-  --color-gray-500: #6b7280;
-  --color-gray-600: #4b5563;
-  --color-gray-700: #374151;
-  --color-gray-800: #1f2937;
-  --color-gray-900: #111827;
-  --color-gray-950: #030712;
-
-  /* Background and foreground */
-  --background: #ffffff;
-  --foreground: #111827;
-  --border: #e5e7eb;
-  --surface: #ffffff;
-  --surface-muted: #f9fafb;
-  --surface-elevated: #ffffff;
-  --text-muted: #6b7280;
-  --text-subtle: #9ca3af;
-  --border-strong: #d1d5db;
-  --accent: #2563eb;
-  --accent-hover: #1d4ed8;
-  --focus-ring: #3b82f6;
+  /* Legacy aliases → SDK tokens */
+  --background: var(--surface-bg);
+  --foreground: var(--text-primary);
+  --border: var(--border-default);
+  --surface: var(--surface-raised);
+  --surface-muted: var(--color-neutral-50);
+  --surface-elevated: var(--surface-raised);
+  --text-muted: var(--color-neutral-500);
+  --text-subtle: var(--color-neutral-400);
+  --border-strong: var(--color-neutral-300);
+  --accent: var(--color-primary-600);
+  --accent-hover: var(--color-primary-700);
+  --focus-ring: var(--color-primary-500);
 
   /* Nextra theme integration */
   --nextra-primary-hue: 217deg;
@@ -76,18 +28,18 @@
 }
 
 .dark {
-  --background: #111827;
-  --foreground: #ffffff;
-  --border: #374151;
-  --surface: #111827;
-  --surface-muted: #0f172a;
-  --surface-elevated: #0b1220;
+  --background: var(--surface-bg);
+  --foreground: var(--text-primary);
+  --border: var(--border-default);
+  --surface: var(--surface-raised);
+  --surface-muted: var(--color-neutral-950);
+  --surface-elevated: var(--color-neutral-950);
   --text-muted: #cbd5e1;
   --text-subtle: #94a3b8;
-  --border-strong: #4b5563;
-  --accent: #60a5fa;
-  --accent-hover: #3b82f6;
-  --focus-ring: #60a5fa;
+  --border-strong: var(--border-strong);
+  --accent: var(--color-primary-400);
+  --accent-hover: var(--color-primary-500);
+  --focus-ring: var(--color-primary-400);
 
   --nextra-primary-hue: 217deg;
   --nextra-primary-saturation: 91%;
