@@ -1,21 +1,71 @@
 import { NextRequest, NextResponse } from 'next/server'
+import Redis from 'ioredis'
 
 const QDRANT_URL = process.env.QDRANT_URL || 'http://localhost:6333'
 const MODEL_URL = process.env.MODEL_URL || 'http://localhost:8082'
 const COLLECTION_NAME = process.env.QDRANT_COLLECTION || 'isa_docs'
 const EMBEDDING_MODEL = process.env.SEARCH_EMBEDDING_MODEL || 'text-embedding-3-small'
 const RATE_LIMIT_MAX = parseInt(process.env.SEARCH_RATE_LIMIT || '30', 10)
+const RATE_LIMIT_WINDOW_SEC = parseInt(process.env.SEARCH_RATE_LIMIT_WINDOW || '60', 10)
 const REQUEST_TIMEOUT_MS = parseInt(process.env.SEARCH_TIMEOUT_MS || '10000', 10)
+const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379'
 
-// Simple in-memory rate limiter (per-IP, sliding window)
-const rateLimitMap = new Map<string, { count: number; resetAt: number }>()
+// Redis client — lazy singleton with graceful degradation
+let redis: Redis | null = null
+let redisAvailable = true
 
-function isRateLimited(ip: string): boolean {
+function getRedis(): Redis | null {
+  if (!redisAvailable) return null
+  if (redis) return redis
+
+  try {
+    redis = new Redis(REDIS_URL, {
+      maxRetriesPerRequest: 1,
+      connectTimeout: 2000,
+      lazyConnect: true,
+      enableOfflineQueue: false,
+    })
+    redis.on('error', () => {
+      redisAvailable = false
+      redis?.disconnect()
+      redis = null
+    })
+    redis.connect().catch(() => {
+      redisAvailable = false
+      redis = null
+    })
+    return redis
+  } catch {
+    redisAvailable = false
+    return null
+  }
+}
+
+// In-memory fallback rate limiter
+const fallbackMap = new Map<string, { count: number; resetAt: number }>()
+
+async function isRateLimited(ip: string): Promise<boolean> {
+  const client = getRedis()
+
+  if (client) {
+    try {
+      const key = `ratelimit:search:${ip}`
+      const count = await client.incr(key)
+      if (count === 1) {
+        await client.expire(key, RATE_LIMIT_WINDOW_SEC)
+      }
+      return count > RATE_LIMIT_MAX
+    } catch {
+      // Redis failed mid-request — fall through to in-memory
+    }
+  }
+
+  // In-memory fallback
   const now = Date.now()
-  const entry = rateLimitMap.get(ip)
+  const entry = fallbackMap.get(ip)
 
   if (!entry || now > entry.resetAt) {
-    rateLimitMap.set(ip, { count: 1, resetAt: now + 60_000 })
+    fallbackMap.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_SEC * 1000 })
     return false
   }
 
@@ -26,7 +76,7 @@ function isRateLimited(ip: string): boolean {
 export async function POST(request: NextRequest) {
   const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
 
-  if (isRateLimited(ip)) {
+  if (await isRateLimited(ip)) {
     return NextResponse.json(
       { results: [], answer: 'Rate limit exceeded. Please try again later.' },
       { status: 429 }
