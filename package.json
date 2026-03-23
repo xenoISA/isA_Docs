@@ -24,14 +24,17 @@
   "dependencies": {
     "@isa/ui-web": "file:../isA_App_SDK/packages/ui-web",
     "@tailwindcss/postcss": "^4.1.18",
+    "ioredis": "^5.10.1",
     "next": "^16.1.5",
     "nextra": "^4.6.1",
     "nextra-theme-docs": "^4.6.1",
+    "pg": "^8.20.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4"
   },
   "devDependencies": {
     "@types/node": "20.19.30",
+    "@types/pg": "^8.20.0",
     "@types/react": "19.2.10",
     "autoprefixer": "^10.4.23",
     "postcss": "^8.5.6",
