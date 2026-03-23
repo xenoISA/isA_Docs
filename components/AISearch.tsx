@@ -27,8 +27,10 @@ export function AISearch() {
   const [results, setResults] = useState<SearchResult[]>([])
   const [loading, setLoading] = useState(false)
   const [answer, setAnswer] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Cmd+K shortcut
   useEffect(() => {
@@ -55,33 +57,56 @@ export function AISearch() {
     return () => document.removeEventListener('mousedown', onClick)
   }, [isOpen])
 
-  // Search handler
-  const handleSearch = async (q: string) => {
+  // Debounced search handler
+  const handleInputChange = (q: string) => {
     setQuery(q)
+    setError(null)
+
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+
     if (q.length < 2) {
       setResults([])
       setAnswer(null)
       return
     }
 
+    debounceRef.current = setTimeout(() => {
+      performSearch(q)
+    }, 300)
+  }
+
+  // Search API call with graceful error handling
+  const performSearch = async (q: string) => {
     setLoading(true)
+    setError(null)
     try {
       const res = await fetch(SEARCH_API, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query: q, top_k: 5 }),
       })
+      if (!res.ok) {
+        throw new Error(`Search returned ${res.status}`)
+      }
       const data = await res.json()
       setResults(data.results || [])
       setAnswer(data.answer || null)
     } catch (err) {
       console.error('Search failed:', err)
       setResults([])
-      setAnswer('Search unavailable')
+      setAnswer(null)
+      setError('Search is temporarily unavailable. Please try again later.')
     } finally {
       setLoading(false)
     }
   }
+
+  // Clean up debounce timer on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current)
+    }
+  }, [])
 
   return (
     <>
@@ -111,7 +136,7 @@ export function AISearch() {
               <input
                 ref={inputRef}
                 value={query}
-                onChange={(e) => handleSearch(e.target.value)}
+                onChange={(e) => handleInputChange(e.target.value)}
                 placeholder="Search documentation..."
                 className="flex-1 bg-transparent outline-none text-foreground"
                 autoFocus
@@ -128,6 +153,16 @@ export function AISearch() {
             {answer && (
               <div className="px-4 py-2 bg-blue-50 dark:bg-blue-900/20 text-sm text-blue-700 dark:text-blue-300 border-b border-border">
                 ✨ {answer}
+              </div>
+            )}
+
+            {/* Error State */}
+            {error && (
+              <div className="px-4 py-3 bg-red-50 dark:bg-red-900/20 text-sm text-red-700 dark:text-red-300 border-b border-border flex items-center gap-2">
+                <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                {error}
               </div>
             )}
 
