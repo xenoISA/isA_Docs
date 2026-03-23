@@ -4,6 +4,7 @@ import { getPageMap } from 'nextra/page-map'
 import 'nextra-theme-docs/style.css'
 import './globals.css'
 import { AISearch } from '../components/AISearch'
+import { ErrorBoundary } from '../components/ErrorBoundary'
 import { PlatformNavBar } from '../components/PlatformNavBar'
 import { ThemeToggle } from '../components/ThemeToggle'
 import { community, getDocsRepositoryBase } from '../lib/surfaces'
@@ -102,7 +103,7 @@ export default async function RootLayout({
           pageMap={pageMap}
           docsRepositoryBase={getDocsRepositoryBase()}
           editLink="Edit this page on GitHub"
-          search={<AISearch />}
+          search={<ErrorBoundary><AISearch /></ErrorBoundary>}
         >
           {children}
         </Layout>

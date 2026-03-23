@@ -17,3 +17,6 @@ export { ApiPlayground, DemoPlayground } from './ApiPlayground'
 
 // AI-powered search
 export { AISearch } from './AISearch'
+
+// Error boundary
+export { ErrorBoundary } from './ErrorBoundary'
