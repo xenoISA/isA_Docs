@@ -16,6 +16,7 @@ export default {
   data: 'Data',
   os: 'OS Services',
   console: 'Console',
+  orch: 'Orchestrator',
   platform: 'Platform',
   '----': {
     type: 'separator',

@@ -23,6 +23,8 @@ export default {
   'human-in-the-loop': 'Human-in-the-Loop',
   'desktop-execution': 'Desktop Execution',
   checkpointing: 'Checkpointing',
+  'budget-guard': 'Budget Guard',
+  'session-watchdog': 'Session Watchdog',
   'long-running-tasks': 'Long-Running Tasks',
   oauth: 'OAuth Transport',
   environment: 'Environment',
