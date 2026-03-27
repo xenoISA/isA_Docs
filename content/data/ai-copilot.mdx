@@ -1,0 +1,175 @@
+# AI Data Dev Copilot
+
+Generate data engineering artifacts from natural language descriptions — ETL pipelines, data models, quality rules, indicators, and SQL queries.
+
+## Overview
+
+The AI data dev copilot translates natural language intents into ready-to-use data engineering artifacts. Powered by isA_Model, it understands your data platform context (Dataphin, local schemas) and generates structured artifacts you can copy directly into your data workflows.
+
+```
+POST /api/v1/data/copilot
+```
+
+## Supported Artifact Types
+
+| Artifact type | `artifact_type` value | Description |
+|--------------|----------------------|-------------|
+| ETL pipeline | `etl_pipeline` | Data ingestion and transformation pipeline skeleton |
+| Data model | `data_model` | Table/entity definitions with columns and relationships |
+| Quality rule | `quality_rule` | Data validation rules (completeness, uniqueness, format) |
+| Indicator | `indicator` | Business metric or KPI definition |
+| SQL query | `sql_query` | SQL for analysis, reporting, or data exploration |
+
+## API Reference
+
+### POST `/api/v1/data/copilot`
+
+**Request:**
+
+```json
+{
+  "intent": "string",
+  "context": {
+    "platform": "dataphin | local",
+    "database": "string",
+    "table": "string"
+  }
+}
+```
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `intent` | Yes | Natural language description of what to generate |
+| `context.platform` | No | Target data platform (default: `local`) |
+| `context.database` | No | Target database/schema name for context |
+| `context.table` | No | Target table name for context |
+
+**Response:**
+
+```json
+{
+  "artifact_type": "etl_pipeline",
+  "content": "...",
+  "metadata": {
+    "model": "gpt-4o-mini",
+    "tokens_used": 842,
+    "platform": "dataphin",
+    "warnings": []
+  }
+}
+```
+
+## Examples
+
+### ETL Pipeline
+
+```bash
+curl -X POST http://localhost:8087/api/v1/data/copilot \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "intent": "Create an ETL pipeline that ingests daily sales data from S3, cleans null values, and loads into the sales_fact table",
+    "context": {"platform": "dataphin", "database": "dw_prod"}
+  }'
+```
+
+**Response:**
+
+```json
+{
+  "artifact_type": "etl_pipeline",
+  "content": "# ETL Pipeline: Daily Sales Ingestion\n\ntype: batch\nschedule: \"0 2 * * *\"  # Daily at 2 AM UTC\n\nsource:\n  type: s3\n  bucket: company-data-lake\n  prefix: sales/daily/\n  format: parquet\n\ntransformations:\n  - type: drop_nulls\n    columns: [order_id, customer_id, amount]\n  - type: cast\n    column: sale_date\n    target_type: date\n  - type: derive\n    column: fiscal_quarter\n    expression: \"QUARTER(sale_date)\"\n\ndestination:\n  type: dataphin_table\n  database: dw_prod\n  table: sales_fact\n  mode: append\n  partition_by: sale_date",
+  "metadata": {
+    "artifact_type": "etl_pipeline",
+    "platform": "dataphin",
+    "tokens_used": 512
+  }
+}
+```
+
+### Data Model
+
+```bash
+curl -X POST http://localhost:8087/api/v1/data/copilot \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "intent": "Design a customer order data model with orders, order_items, and products tables including foreign keys and indexes",
+    "context": {"platform": "local", "database": "ecommerce"}
+  }'
+```
+
+**Response:**
+
+```json
+{
+  "artifact_type": "data_model",
+  "content": "-- Customer Order Data Model\n\nCREATE TABLE customers (\n  customer_id  BIGINT PRIMARY KEY,\n  email        VARCHAR(255) UNIQUE NOT NULL,\n  name         VARCHAR(255),\n  created_at   TIMESTAMP DEFAULT NOW()\n);\n\nCREATE TABLE orders (\n  order_id     BIGINT PRIMARY KEY,\n  customer_id  BIGINT REFERENCES customers(customer_id),\n  status       VARCHAR(50) DEFAULT 'pending',\n  total_amount DECIMAL(10,2),\n  created_at   TIMESTAMP DEFAULT NOW()\n);\nCREATE INDEX idx_orders_customer ON orders(customer_id);\nCREATE INDEX idx_orders_status ON orders(status);\n\nCREATE TABLE order_items (\n  item_id    BIGINT PRIMARY KEY,\n  order_id   BIGINT REFERENCES orders(order_id),\n  product_id BIGINT REFERENCES products(product_id),\n  quantity   INT NOT NULL,\n  unit_price DECIMAL(10,2) NOT NULL\n);\n\nCREATE TABLE products (\n  product_id  BIGINT PRIMARY KEY,\n  sku         VARCHAR(100) UNIQUE,\n  name        VARCHAR(255),\n  price       DECIMAL(10,2),\n  stock_count INT DEFAULT 0\n);",
+  "metadata": {"artifact_type": "data_model", "tokens_used": 389}
+}
+```
+
+### Data Quality Rule
+
+```bash
+curl -X POST http://localhost:8087/api/v1/data/copilot \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "intent": "Create quality rules for the orders table: order_id must be unique, amount must be positive, status must be one of pending/paid/cancelled",
+    "context": {"platform": "dataphin", "database": "dw_prod", "table": "orders"}
+  }'
+```
+
+### SQL Query
+
+```bash
+curl -X POST http://localhost:8087/api/v1/data/copilot \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "intent": "Monthly revenue by product category for the last 6 months, ranked by revenue",
+    "context": {"platform": "local", "database": "ecommerce"}
+  }'
+```
+
+### Business Indicator
+
+```bash
+curl -X POST http://localhost:8087/api/v1/data/copilot \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "intent": "Define a customer lifetime value (CLV) indicator based on total spend and order frequency over 12 months",
+    "context": {"platform": "dataphin", "database": "dw_prod"}
+  }'
+```
+
+## Platform Integration
+
+### Dataphin
+
+When `context.platform = "dataphin"`, the copilot generates artifacts using Dataphin SDK conventions — compatible with the official Dataphin SDK that backs all four backends (indicator, governance, warehouse, master data).
+
+### Local
+
+When `context.platform = "local"` (default), artifacts use standard SQL and YAML conventions compatible with any database. Generated SQL follows ANSI SQL with PostgreSQL extensions.
+
+## Usage Notes
+
+- Generated artifacts are **starting points** — review and adapt before deploying to production
+- Providing `context.table` improves accuracy for quality rules and SQL queries
+- Complex ETL pipelines may need manual refinement for environment-specific connection details
+- Token usage is billed against your isA_Model credit balance (see [Billing](../model/billing))
+
+## Required Permissions
+
+| Endpoint | Permission |
+|----------|-----------|
+| `POST /api/v1/data/copilot` | `pipelines:execute` |
+
+## Next Steps
+
+- [RAG Patterns](./rag-patterns) — retrieval-augmented generation for knowledge management
+- [Data Fabric](./data-fabric) — unified data access layer
+- [Billing](../model/billing) — credit usage for copilot requests

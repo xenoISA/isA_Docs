@@ -1,0 +1,212 @@
+# OAuth 2.0 Authorization Code + PKCE
+
+Secure delegated authorization for third-party clients and browser-based apps using the Authorization Code flow with PKCE (Proof Key for Code Exchange).
+
+> **Scope migration**: OAuth scopes changed from `a2a.*` to `mcp:*` in v0.7. See the [scope migration guide](./scope-migration) before implementing.
+
+## Overview
+
+The Authorization Code + PKCE flow lets a client application obtain access tokens on behalf of a user without ever handling the user's password. PKCE (RFC 7636) protects against authorization code interception attacks and is required for all public clients (browser apps, mobile apps, CLI tools).
+
+```
+Client                    isA Auth Server           User
+  │                              │                    │
+  │── Generate code_verifier ───▶│                    │
+  │   code_challenge = SHA256(verifier)               │
+  │                              │                    │
+  │── GET /oauth/authorize ─────▶│                    │
+  │   ?code_challenge=...        │──── Login page ───▶│
+  │   &client_id=...             │◀─── User consents ─│
+  │   &redirect_uri=...          │                    │
+  │◀─ ?code=AUTH_CODE ──────────│                    │
+  │                              │                    │
+  │── POST /oauth/token ────────▶│                    │
+  │   code + code_verifier       │                    │
+  │◀─ access_token + refresh ───│                    │
+```
+
+## Step 1 — Generate PKCE Parameters
+
+```python
+import secrets
+import hashlib
+import base64
+
+# Generate a cryptographically random code_verifier (43–128 chars)
+code_verifier = secrets.token_urlsafe(64)  # 86-char URL-safe string
+
+# Derive code_challenge using S256 method
+digest = hashlib.sha256(code_verifier.encode()).digest()
+code_challenge = base64.urlsafe_b64encode(digest).rstrip(b"=").decode()
+
+print(f"verifier: {code_verifier}")
+print(f"challenge: {code_challenge}")
+```
+
+```javascript
+// Browser / Node.js
+const array = new Uint8Array(64);
+crypto.getRandomValues(array);
+const codeVerifier = btoa(String.fromCharCode(...array))
+  .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+
+const encoder = new TextEncoder();
+const data = encoder.encode(codeVerifier);
+const digest = await crypto.subtle.digest('SHA-256', data);
+const codeChallenge = btoa(String.fromCharCode(...new Uint8Array(digest)))
+  .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+```
+
+## Step 2 — Redirect to Authorization Endpoint
+
+```
+GET /oauth/authorize
+```
+
+Redirect the user's browser to the authorization endpoint with the following query parameters:
+
+| Parameter | Required | Description |
+|-----------|----------|-------------|
+| `client_id` | Yes | Your application's client ID |
+| `redirect_uri` | Yes | Where to send the user after consent |
+| `response_type` | Yes | Always `code` |
+| `scope` | Yes | Space-separated list of `mcp:*` scopes |
+| `code_challenge` | Yes | SHA-256 hash of `code_verifier` (base64url) |
+| `code_challenge_method` | Yes | Always `S256` |
+| `state` | Recommended | Random value to prevent CSRF |
+
+```bash
+https://auth.isa.ai/oauth/authorize
+  ?client_id=app_abc123
+  &redirect_uri=https://myapp.example.com/callback
+  &response_type=code
+  &scope=mcp%3Atools%3Aexecute+mcp%3Aresources%3Aread
+  &code_challenge=E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM
+  &code_challenge_method=S256
+  &state=xyzABC123
+```
+
+The user sees the consent screen at `/oauth/consent` listing the requested scopes with human-readable descriptions. After approving, they are redirected to your `redirect_uri`.
+
+## Step 3 — Receive the Authorization Code
+
+After user consent, the auth server redirects to your `redirect_uri` with:
+
+```
+https://myapp.example.com/callback
+  ?code=SplxlOBeZQQYbYS6WxSbIA
+  &state=xyzABC123
+```
+
+**Validate `state`** before proceeding — if it doesn't match what you sent, abort.
+
+Authorization codes expire in **60 seconds** and are single-use.
+
+## Step 4 — Exchange Code for Tokens
+
+```
+POST /oauth/token
+Content-Type: application/x-www-form-urlencoded
+```
+
+```bash
+curl -X POST https://auth.isa.ai/oauth/token \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "grant_type=authorization_code" \
+  -d "code=SplxlOBeZQQYbYS6WxSbIA" \
+  -d "redirect_uri=https://myapp.example.com/callback" \
+  -d "client_id=app_abc123" \
+  -d "code_verifier=dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
+```
+
+**Response:**
+
+```json
+{
+  "access_token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "token_type": "Bearer",
+  "expires_in": 3600,
+  "refresh_token": "tGzv3JOkF0XG5Qx2TlKWIA",
+  "scope": "mcp:tools:execute mcp:resources:read"
+}
+```
+
+## Step 5 — Use the Access Token
+
+Include the access token as a Bearer token on API requests:
+
+```bash
+curl https://mcp.isa.ai/api/v1/tools/execute \
+  -H "Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9..."
+```
+
+## Token Refresh
+
+Access tokens expire in 1 hour. Refresh without re-prompting the user:
+
+```bash
+curl -X POST https://auth.isa.ai/oauth/token \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "grant_type=refresh_token" \
+  -d "refresh_token=tGzv3JOkF0XG5Qx2TlKWIA" \
+  -d "client_id=app_abc123"
+```
+
+Refresh tokens do not expire but are invalidated on logout or password change.
+
+## Public vs Confidential Clients
+
+| Client type | `client_secret` required | Examples |
+|-------------|------------------------|---------|
+| **Public** | No | SPA, mobile app, CLI tool |
+| **Confidential** | Yes (in token request) | Server-side web app |
+
+Confidential clients send `client_secret` in the token exchange request:
+
+```bash
+-d "client_secret=YOUR_SECRET"
+```
+
+Public clients rely on PKCE alone — never embed a `client_secret` in client-side code.
+
+## Authorization Server Metadata
+
+Discover all OAuth endpoints automatically:
+
+```bash
+curl https://auth.isa.ai/.well-known/oauth-authorization-server
+```
+
+```json
+{
+  "issuer": "https://auth.isa.ai",
+  "authorization_endpoint": "https://auth.isa.ai/oauth/authorize",
+  "token_endpoint": "https://auth.isa.ai/oauth/token",
+  "response_types_supported": ["code"],
+  "grant_types_supported": ["authorization_code", "refresh_token"],
+  "code_challenge_methods_supported": ["S256"],
+  "scopes_supported": [
+    "mcp:tools:execute", "mcp:tools:read",
+    "mcp:resources:read", "mcp:resources:write",
+    "mcp:admin:servers", "mcp:admin:tenants"
+  ],
+  "client_id_metadata_document_supported": true
+}
+```
+
+## Error Handling
+
+| Error | Cause | Resolution |
+|-------|-------|-----------|
+| `invalid_request` | Missing required parameter | Check all required params are present |
+| `invalid_client` | Unknown `client_id` | Verify client registration |
+| `invalid_grant` | Expired or used code | Restart the flow |
+| `invalid_pkce` | `code_verifier` doesn't match challenge | Regenerate PKCE pair and restart |
+| `access_denied` | User rejected consent | Inform user and offer retry |
+| `unsupported_grant_type` | Wrong `grant_type` value | Use `authorization_code` |
+
+## Next Steps
+
+- [Scope Migration Guide](./scope-migration) — migrate from `a2a.*` to `mcp:*` scopes
+- [Authentication](./authentication) — JWT and API key auth
+- [MCP Security](../mcp/security) — how the MCP service validates Bearer tokens

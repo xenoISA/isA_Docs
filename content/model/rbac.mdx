@@ -1,0 +1,164 @@
+# RBAC — Role-Based Access Control
+
+Fine-grained per-resource access control for the isA Model Service, using a `resource:action` permission model.
+
+## Overview
+
+RBAC restricts which operations an API key can perform. Permissions are expressed as `resource:action` strings and are embedded in JWT claims. Every authenticated request is checked against the required permission for that endpoint.
+
+Enable RBAC via environment variable:
+
+```bash
+RBAC_ENABLED=true
+```
+
+> **Note**: When `RBAC_ENABLED=false` (default in development), all authenticated requests are permitted regardless of permissions.
+
+## Resource Types
+
+| Resource | Actions | Description |
+|----------|---------|-------------|
+| `agents` | `read`, `write`, `execute`, `admin` | Agent configs, templates, deployments |
+| `tools` | `read`, `execute`, `admin` | MCP tool execution and metadata |
+| `models` | `read`, `execute`, `admin` | Model invocation and management |
+| `sessions` | `read`, `write`, `admin` | Session state and checkpoints |
+| `checkpoints` | `read`, `write`, `admin` | Checkpoint storage and compaction |
+| `users` | `read`, `write`, `admin` | User accounts and profiles |
+| `orgs` | `read`, `write`, `admin` | Organization management |
+| `billing` | `read`, `admin` | Usage data and credit management |
+| `audit_logs` | `read`, `admin` | Audit log access |
+| `storage` | `read`, `write`, `admin` | Object storage (MinIO) |
+| `pipelines` | `read`, `execute`, `admin` | Data pipeline execution |
+
+## Actions
+
+| Action | Meaning |
+|--------|---------|
+| `read` | GET / list / query — no mutations |
+| `write` | Create / update / delete |
+| `execute` | Trigger execution (model call, tool call, pipeline run) |
+| `admin` | All of the above + destructive ops (delete all, purge, force rollback) |
+
+## JWT Permission Claims
+
+Permissions are embedded in the JWT as an array under the `permissions` claim:
+
+```json
+{
+  "sub": "user_abc123",
+  "iss": "https://auth.isa.ai",
+  "permissions": [
+    "agents:read",
+    "agents:execute",
+    "tools:execute",
+    "models:execute",
+    "billing:read"
+  ],
+  "exp": 1743120000
+}
+```
+
+## Common Permission Sets
+
+### Builder (typical developer API key)
+
+```json
+[
+  "agents:read",
+  "agents:write",
+  "agents:execute",
+  "tools:read",
+  "tools:execute",
+  "models:read",
+  "models:execute",
+  "sessions:read",
+  "sessions:write",
+  "billing:read"
+]
+```
+
+### Operator (production monitoring)
+
+```json
+[
+  "agents:read",
+  "agents:execute",
+  "tools:read",
+  "models:read",
+  "sessions:read",
+  "checkpoints:read",
+  "billing:read",
+  "audit_logs:read"
+]
+```
+
+### Admin
+
+```json
+[
+  "agents:admin",
+  "tools:admin",
+  "models:admin",
+  "sessions:admin",
+  "checkpoints:admin",
+  "users:admin",
+  "orgs:admin",
+  "billing:admin",
+  "audit_logs:admin",
+  "storage:admin",
+  "pipelines:admin"
+]
+```
+
+### Read-Only Auditor
+
+```json
+[
+  "agents:read",
+  "billing:read",
+  "audit_logs:read",
+  "sessions:read"
+]
+```
+
+## Endpoint → Permission Mapping
+
+| Endpoint | Required permission |
+|----------|-------------------|
+| `POST /api/v1/invoke` | `models:execute` |
+| `GET /api/v1/models` | `models:read` |
+| `GET /api/v1/usage` | `billing:read` |
+| `GET /api/v1/audit` | `audit_logs:read` |
+| `DELETE /api/v1/tenants/{id}` | `orgs:admin` |
+| `GET /api/v1/agents/{id}` | `agents:read` |
+| `POST /api/v1/agents` | `agents:write` |
+| `POST /api/v1/deployments` | `agents:write` |
+| `POST /api/v1/deployments/{id}/promote` | `agents:admin` |
+
+## Error Response
+
+When a request lacks the required permission:
+
+```json
+{
+  "error": "forbidden",
+  "message": "Missing required permission: billing:read",
+  "required": "billing:read",
+  "status": 403
+}
+```
+
+## Feature Flag Rollout
+
+RBAC can be enabled incrementally using the `RBAC_ENABLED` flag. During rollout:
+
+1. Deploy with `RBAC_ENABLED=false` — all existing requests continue working
+2. Audit JWT claims across your API keys using `GET /api/v1/audit?resource=auth`
+3. Update API key permissions to match required scopes
+4. Set `RBAC_ENABLED=true` in production
+
+## Next Steps
+
+- [Billing Overview](./billing) — credits and metering
+- [Audit Logging](./audit-logging) — track permission usage
+- [Metering API](./metering) — billing-scoped endpoints

@@ -200,6 +200,68 @@ result = await client.call_tool("add_mcp_server", {
 })
 ```
 
+## Connection Pooling
+
+The `SessionManager` maintains a pool of active MCP server connections to avoid the overhead of reconnecting on every request.
+
+### How It Works
+
+- **Lazy connect**: connections are established on the first tool call, not at startup
+- **LRU eviction**: when the pool reaches capacity, the least-recently-used connection is evicted
+- **Max 30 connections**: configurable via `MCP_POOL_MAX_SIZE` env var
+
+```bash
+MCP_POOL_MAX_SIZE=30   # Maximum concurrent connections (default: 30)
+```
+
+### Pool Stats
+
+Monitor pool health:
+
+```bash
+curl http://localhost:8081/api/v1/mcp/pool/stats \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
+
+```json
+{
+  "active": 12,
+  "idle": 4,
+  "capacity": 30,
+  "evictions": 3,
+  "reconnections": 1
+}
+```
+
+| Field | Description |
+|-------|-------------|
+| `active` | Connections currently handling requests |
+| `idle` | Connections open but not active |
+| `capacity` | Pool size limit |
+| `evictions` | Total LRU evictions since startup |
+| `reconnections` | Connections re-established after eviction |
+
+## Server Priority Tiers
+
+Assign a priority to each MCP server to control health check frequency and eviction behavior.
+
+```python
+# Set priority when registering a server
+{
+  "name": "critical-tool-server",
+  "url": "http://tool-server:8082",
+  "priority": "CRITICAL"   # CRITICAL | STANDARD | OPTIONAL
+}
+```
+
+| Priority | Health check interval | LRU eviction |
+|----------|--------------------- |-------------|
+| `CRITICAL` | Every 30 seconds | **Exempt** — never evicted |
+| `STANDARD` | Every 60 seconds | Subject to eviction |
+| `OPTIONAL` | Every 120 seconds | First to be evicted |
+
+Use `CRITICAL` for tool servers that are essential to your workflow (e.g., file system tools, code execution). Optional servers for rarely-used integrations can be `OPTIONAL` to free up pool capacity.
+
 ## Regenerating Init Scripts
 
 ```bash

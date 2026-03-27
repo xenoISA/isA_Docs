@@ -245,6 +245,108 @@ async for msg in query("Delete old files", options=options):
         print(msg.content, end="")
 ```
 
+## Checkpoint Compaction
+
+For sessions that run for hours or days, checkpoint history can grow large. `CheckpointCompactor` prunes old checkpoints while preserving any checkpoints you've explicitly tagged.
+
+```python
+from isa_agent_sdk.services.persistence import CheckpointCompactor
+
+compactor = CheckpointCompactor(
+    session_id="long-job-xyz",
+    max_checkpoints=50,             # Keep at most 50 untagged checkpoints
+    compaction_interval_mins=60,    # Run compaction every 60 minutes
+)
+
+await compactor.start()
+```
+
+### Tagging Checkpoints
+
+Tag a checkpoint to exclude it from compaction:
+
+```python
+async for msg in query("Process files...", options=options):
+    if msg.is_checkpoint and msg.metadata.get("milestone"):
+        # Tag this checkpoint so it's never pruned
+        await msg.tag(label="milestone-complete")
+```
+
+Tagged checkpoints are preserved regardless of `max_checkpoints`. Use tags for meaningful milestones (e.g., "phase 1 complete", "all files indexed").
+
+### Compaction Reference
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `max_checkpoints` | `50` | Maximum untagged checkpoints to retain |
+| `compaction_interval_mins` | `60` | How often to run the compaction pass |
+
+## Session State Garbage Collection
+
+The `GarbageCollector` removes expired checkpoints, stale Redis keys, and old task results on a schedule.
+
+```python
+from isa_agent_sdk.services.persistence import GarbageCollector
+
+gc = GarbageCollector(
+    checkpoint_ttl_days=30,     # Delete checkpoints older than 30 days
+    redis_key_ttl_hours=48,     # Evict stale Redis session keys after 48h
+    task_result_ttl_days=7,     # Remove task result records after 7 days
+)
+
+# Dry run — see what would be deleted without deleting
+report = await gc.dry_run()
+print(f"Would delete: {report.checkpoint_count} checkpoints, {report.redis_key_count} Redis keys")
+
+# Run actual GC
+await gc.run()
+```
+
+### GC Configuration Reference
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `checkpoint_ttl_days` | `30` | Checkpoints older than this are deleted |
+| `redis_key_ttl_hours` | `48` | Stale Redis session keys evicted after this |
+| `task_result_ttl_days` | `7` | Task result records older than this are deleted |
+
+Run GC as a scheduled background task:
+
+```python
+import asyncio
+
+async def schedule_gc():
+    gc = GarbageCollector()
+    while True:
+        await gc.run()
+        await asyncio.sleep(24 * 3600)  # Daily
+```
+
+## Warm Restart
+
+When an agent resumes from a checkpoint, it normally re-fetches all MCP tool schemas from scratch — adding latency proportional to the number of registered MCP servers. Warm restart caches schemas in Redis so resume is near-instant.
+
+### How It Works
+
+1. On first run: tool schemas are fetched from MCP servers and cached in Redis under `mcp:schema:{session_id}`
+2. On resume: schemas are loaded from Redis cache, skipping MCP server round-trips
+3. Cache is invalidated when: an MCP server reconnects, a schema version changes, or the session GC removes the key
+
+### Enabling Warm Restart
+
+Warm restart is enabled by default when `REDIS_URL` is configured. To disable:
+
+```bash
+MCP_SCHEMA_CACHE_ENABLED=false
+```
+
+### Cache Configuration
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `MCP_SCHEMA_CACHE_ENABLED` | `true` | Enable/disable warm restart caching |
+| `MCP_SCHEMA_CACHE_TTL_HOURS` | `24` | How long to keep cached schemas |
+
 ## Best Practices
 
 1. **Use explicit session IDs** for tasks you might need to resume
@@ -252,7 +354,9 @@ async for msg in query("Delete old files", options=options):
 3. **Handle checkpoint events** in streaming for visibility
 4. **Use COLLABORATIVE mode** for long-running tasks
 5. **Configure production backend** (session_service or postgres)
-6. **Implement cleanup** for completed sessions
+6. **Tag milestone checkpoints** to protect them from compaction
+7. **Run GC daily** to prevent unbounded checkpoint accumulation
+8. **Enable warm restart** (default) for fast resume on long-running sessions
 
 ## Environment Variables
 

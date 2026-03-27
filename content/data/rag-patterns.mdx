@@ -359,8 +359,85 @@ response = await client.post(
 # }
 ```
 
+## Hybrid GraphRAG with RRF Fusion
+
+Combines graph-based retrieval (Neo4j) with vector similarity search (Qdrant) and merges results using Reciprocal Rank Fusion for higher recall than either source alone.
+
+### How It Works
+
+```
+Query
+  │
+  ├──▶ Graph retrieval (Neo4j)    → ranked results A
+  ├──▶ Vector retrieval (Qdrant)  → ranked results B
+  │
+  ▼
+Reciprocal Rank Fusion (k=60)
+  │
+  ▼
+Merged & re-ranked results → LLM → Response
+```
+
+RRF score formula: `score = Σ 1/(k + rank_i)` where `k=60` is a smoothing constant. Results that appear highly ranked in both sources receive the highest fused score.
+
+### Usage
+
+```python
+response = await client.post(
+    "/api/v1/digital/search",
+    json={
+        "user_id": "user123",
+        "query": "How do agent checkpoints relate to session state?",
+        "search_options": {
+            "rag_mode": "hybrid_graph",
+            "top_k": 10
+        }
+    }
+)
+```
+
+### When to Use
+
+| Scenario | Recommended pattern |
+|----------|-------------------|
+| Entity-relationship questions | Hybrid GraphRAG |
+| Semantic similarity only | Simple RAG or RAG Fusion |
+| Graph traversal only | Graph RAG |
+| Best recall on complex questions | Hybrid GraphRAG |
+
+## Vector DB Backends
+
+isA Data supports multiple vector database backends implementing the `BaseVectorDB` interface:
+
+| Backend | `VectorDBType` | Best for |
+|---------|----------------|---------|
+| Qdrant (default) | `QDRANT` | Production, full-featured, hosted |
+| Milvus | `MILVUS` | High-scale, distributed deployments |
+
+### Milvus Backend
+
+Configure Milvus via environment variables:
+
+```bash
+VECTOR_DB_TYPE=MILVUS
+MILVUS_HOST=localhost
+MILVUS_PORT=19530
+MILVUS_COLLECTION=isa_docs   # Collection name (default: isa_data)
+```
+
+The Milvus backend implements the same `BaseVectorDB` API — no code changes needed to switch from Qdrant:
+
+```python
+# Works identically regardless of backend
+response = await client.post(
+    "/api/v1/digital/store",
+    json={"user_id": "user123", "content": "...", "content_type": "text"}
+)
+```
+
 ## Next Steps
 
 - [Quick Start](./quickstart) - Get started
 - [Data Lake](./data-lake) - Zone management
 - [File Processing](./file-processing) - Multi-modal content
+- [AI Data Copilot](./ai-copilot) - Generate data artifacts from natural language

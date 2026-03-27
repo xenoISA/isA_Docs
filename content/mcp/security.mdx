@@ -63,9 +63,71 @@ API key verification is integrated with the auth stack; query-param API key usag
 - private and metadata IP ranges blocked
 - restrictive scheme handling and redirect controls
 
+## OAuth 2.0 Resource Server (RFC 8707)
+
+MCP acts as an OAuth 2.0 resource server, accepting Bearer tokens issued by the isA Authorization Server. This enables external applications to call MCP tools on behalf of a user using delegated authorization.
+
+### Bearer Token Validation
+
+Include the access token on every request:
+
+```http
+Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
+X-Organization-Id: org_abc123
+```
+
+MCP validates Bearer tokens using RS256 or ES256 signature verification. Tokens must include the appropriate `mcp:*` scope for the operation being requested.
+
+### Resource Server Metadata
+
+Discover the resource server configuration automatically:
+
+```bash
+curl https://mcp.isa.ai/.well-known/oauth-protected-resource
+```
+
+```json
+{
+  "resource": "https://mcp.isa.ai",
+  "authorization_servers": ["https://auth.isa.ai"],
+  "bearer_methods_supported": ["header"],
+  "scopes_supported": [
+    "mcp:tools:execute",
+    "mcp:tools:read",
+    "mcp:resources:read",
+    "mcp:resources:write",
+    "mcp:admin:servers",
+    "mcp:admin:tenants"
+  ]
+}
+```
+
+This endpoint is public (no auth required) and follows RFC 8707 Protected Resource Metadata.
+
+### Scope Requirements
+
+| Operation | Required scope |
+|-----------|---------------|
+| Execute a tool | `mcp:tools:execute` |
+| List tools / read schemas | `mcp:tools:read` |
+| Read MCP resources | `mcp:resources:read` |
+| Write MCP resources | `mcp:resources:write` |
+| Manage MCP servers | `mcp:admin:servers` |
+| Multi-tenant admin | `mcp:admin:tenants` |
+
+### Scope Migration
+
+Scopes changed from `a2a.*` to `mcp:*` in v0.7. The auth middleware auto-normalizes legacy `a2a.*` scopes during the transition window. See the [scope migration guide](/user/scope-migration) for details.
+
+### Browser POST Tools
+
+Tools that use POST from browser contexts (via Server-Sent Events) are supported with Bearer token auth. The auth middleware handles CORS pre-flight and token validation for browser-originated requests.
+
 ## Related
 
 - [Tools](./tools)
 - [Multi-Tenant](./multi-tenant)
 - [Reliability](./reliability)
+- [OAuth 2.0 PKCE Guide](/user/oauth-pkce)
+- [Scope Migration Guide](/user/scope-migration)
 

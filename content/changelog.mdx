@@ -2,6 +2,101 @@
 
 All notable changes to the isA platform.
 
+## v0.7.0 — March 27, 2026
+
+### isA_Agent_SDK — Long-Running Agent Hardening (Epic #510)
+
+- **[New]** Tiered memory hierarchy: replaced flat `summary` with 3-tier system (working → episodic → semantic memory)
+- **[New]** `BudgetGuard`: max_credits/max_tokens enforcement with pause/warn/stop actions
+- **[New]** `SessionWatchdog`: stall detection with NATS heartbeat publishing and Redis liveness polling
+- **[New]** Checkpoint compaction: `CheckpointCompactor` with configurable limits, preserves tagged snapshots
+- **[New]** Session state garbage collection: cleanup service for expired checkpoints, stale Redis keys, old task results; supports dry-run + configurable TTLs
+- **[New]** Warm restart: MCP tool schemas cached in Redis to reduce cold-start penalty on resume
+- **[New]** Idempotency tokens: SHA-256 keys + Redis cache prevent double-execution on checkpoint replay
+- **[New]** `CommandGuard`: 30 regex patterns blocking destructive filesystem/git/k8s/DB operations pre-execution
+
+### isA_MCP — OAuth 2.0 & Scalability (Epics #411, #417)
+
+- **[New]** OAuth 2.0 resource server with RFC 8707 metadata endpoint (`/.well-known/oauth-protected-resource`)
+- **[New]** Bearer token validation middleware (RS256/ES256) for browser POST tools
+- **[New]** Connection pooling with LRU eviction: max 30 concurrent connections, lazy-connect, pool stats API
+- **[New]** Server priority tiers: CRITICAL/STANDARD/OPTIONAL with tiered health check intervals; critical servers exempt from eviction
+- **[New]** O(1) tool routing: `_tool_index` dict in ToolAggregator replaces O(n) scans
+- **[New]** Parallel health checks with bounded concurrency (env: `HEALTH_CHECK_CONCURRENCY`, default: 10)
+- **[New]** Configurable asyncpg pool size via `DB_POOL_MIN_SIZE`/`DB_POOL_MAX_SIZE`
+- **[Breaking]** Scope migration: `a2a.*` scopes renamed to `mcp:*`. Auto-normalization middleware preserves backward compat during transition window.
+
+### isA_Model — Platform Billing & Metering (Epic #495)
+
+- **[New]** Complete billing infrastructure: atomic Redis Lua-script reservation, NATS billing events, Dead Letter Queue stream
+- **[New]** Per-meter tracking: `MeterType` enum for tokens, tool calls, storage ops, pipeline runs
+- **[New]** `/api/v1/usage` endpoint: credit balance, consumption history, cost attribution by project/api_key
+- **[New]** Billing hooks for MCP tools (`/api/v1/tools/usage`), storage (`/api/v1/storage/usage`), pipelines (`/api/v1/pipelines/usage`)
+- **[New]** Credit alerts via NATS when balance approaches threshold
+- **[New]** Per-resource RBAC: `resource:action` model, 11 resource types, feature-flagged rollout
+- **[New]** Immutable audit logging via NATS JetStream: non-blocking `AuditPublisher`, admin query endpoint
+- **[New]** GDPR compliance: cascading tenant deletion across PG/Redis/Qdrant/NATS; K8s CronJob cleanup; admin endpoints
+
+### isA_user — OAuth 2.0 Authorization Server (Epic #161)
+
+- **[New]** Authorization Code + PKCE flow: `GET /oauth/authorize`, `POST /oauth/consent-approval`, token exchange
+- **[New]** Client ID Metadata Document (CIMD) fetcher and cache per RFC 8707 Dynamic Clients
+- **[New]** `/.well-known/oauth-authorization-server` metadata: advertises `authorization_endpoint`, `code_challenge_methods_supported`, CIMD support
+- **[New]** New DB tables: `oauth_authorization_codes`, `oauth_client_metadata`
+- **[Breaking]** Default OAuth scopes changed from `a2a.*` to `mcp:*`. Legacy scopes auto-mapped.
+
+### isA_Orch — Platform Code Index (Epic #1)
+
+- **[New]** `isa-orch` CLI: `index`, `search`, `impact`, `stats`, `projects`, `project-context`, `test-scaffold` commands
+- **[New]** Python AST + TypeScript tree-sitter parsing across all 19 isA projects
+- **[New]** Semantic code search: local sentence-transformers embedding index, `--semantic` flag
+- **[New]** Cross-project edge resolution with same-project preference (3-pass algorithm)
+- **[New]** Test directory scaffolding: `detect_context()` + `scaffold_test_dirs()` CLI commands
+- **[New]** Incremental indexing with checksum skipping and stale file pruning
+
+### isA_Vibe — Multi-Turn Dispatch (Epic #199)
+
+- **[New]** Phased CDD/TDD/Deploy execution: `Phase` enum, per-phase graph executions with session resume
+- **[New]** Session manager: phase 1 uses `execute()`, phases 2+ use `query()` for context continuity (1800+ turns/run)
+- **[New]** Manifest chunker: `FileManifest`/`FileSpec` + `chunk_manifest()` for batch-aware prompts
+- **[New]** Phase completion detection: scans for CDD/TDD/Deploy outputs, generates continuation prompts
+- **[New]** Sandbox isolation: git worktree per run — create/validate/merge/cleanup lifecycle
+- **[New]** Auto-revert on post-push test failure
+- **[New]** `BudgetGuard` and `CheckpointStore` wired into orchestrator
+
+### isA_Data — Vector & AI Features
+
+- **[New]** Milvus vector DB backend: `MilvusVectorDB` implementing `BaseVectorDB`, registered as `VectorDBType.MILVUS`
+- **[New]** Hybrid GraphRAG with RRF fusion: parallel graph + Qdrant retrieval fused via Reciprocal Rank Fusion (k=60)
+- **[New]** AI data dev copilot: `POST /api/v1/data/copilot` — NL → ETL/model/quality rule/indicator/SQL artifact generation
+- **[New]** Official Dataphin SDK integration: all 4 backends migrated to SDK methods
+- **[New]** Master data backend with AI entity resolution and merge candidates
+
+### isA_Agent — Agent Management
+
+- **[New]** Template management API: CRUD, versioning, categories, tags, 8 builtin templates (undeletable), version history + rollback
+- **[New]** Deployment automation: canary/blue-green/rollback with configure/promote/rollback/status endpoints
+- **[New]** Config versioning: immutable snapshots on every create/update, `GET /versions`, `POST /rollback`
+- **[New]** Audit trail: field-level diffs, bounded deque store, persists after config deletion
+
+### isA_Console — UI & Observability
+
+- **[New]** OAuth consent screen: `/oauth/consent`, `/oauth/callback`, `/oauth/error` pages with scope descriptions
+- **[New]** Marketplace: `/dashboard/marketplace` — 24 built-in skills across 9 categories with search + filters
+- **[New]** Agent lifecycle badges: `StatusBadge` component, version history page, Grafana monitoring embeds
+- **[New]** Loki log shipping: batched via `sendBeacon`, global error handlers, `global-error.tsx` boundary
+- **[New]** OpenTelemetry + Web Vitals instrumentation
+- **[New]** Responsive sidebar with mobile drawer + hamburger
+
+### isA_Cloud — Infrastructure
+
+- **[New]** 4 Grafana monitoring dashboards: agent-execution, mcp-tools, resource-pools, service-mesh
+- **[New]** APISIX routes for OAuth `/.well-known` discovery endpoints (all 3 environments)
+- **[New]** mcp-worker ArgoCD app manifests (staging auto-sync, production manual)
+- **[New]** Custom HPA metrics rendering in Helm template
+
+---
+
 ## [Unreleased]
 
 ### Added

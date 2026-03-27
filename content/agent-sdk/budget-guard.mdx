@@ -1,0 +1,212 @@
+# BudgetGuard
+
+Prevent runaway cost and token usage by attaching spending limits to any agent session.
+
+## Overview
+
+Long-running agents can consume significant API credits and tokens without any natural stopping point. `BudgetGuard` enforces configurable thresholds at three levels — warn, pause, and stop — giving you fine-grained control over how the agent responds as usage approaches a budget ceiling.
+
+`BudgetGuard` integrates directly with the isA billing metering service. Usage is tracked in real time; thresholds are evaluated after each model turn.
+
+## Constructor
+
+```python
+from isa_agent_sdk.guards import BudgetGuard
+
+guard = BudgetGuard(
+    max_credits=10.00,    # Maximum spend in USD (None = unlimited)
+    max_tokens=500_000,   # Maximum total tokens (None = unlimited)
+    warn_at=0.80,         # Fraction of budget that triggers a warning
+    pause_at=0.95,        # Fraction of budget that pauses execution
+    stop_at=1.00,         # Fraction of budget that raises BudgetExceeded
+)
+```
+
+### Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `max_credits` | `float \| None` | `None` | Maximum spend in USD. `None` disables credit tracking. |
+| `max_tokens` | `int \| None` | `None` | Maximum total tokens (prompt + completion). `None` disables token tracking. |
+| `warn_at` | `float` | `0.80` | Fraction of `max_credits` or `max_tokens` at which a warning is logged. Must be < `pause_at`. |
+| `pause_at` | `float` | `0.95` | Fraction at which execution is paused pending user confirmation. Must be < `stop_at`. |
+| `stop_at` | `float` | `1.00` | Fraction at which `BudgetExceeded` is raised and execution halts. |
+
+At least one of `max_credits` or `max_tokens` must be set. Both can be set simultaneously; the guard fires on whichever threshold is crossed first.
+
+## Threshold Action Table
+
+| Threshold | Default Fraction | Action |
+|-----------|-----------------|--------|
+| `warn_at` | 0.80 (80%) | Logs a structured warning: `budget.warn` with current usage and remaining headroom. Execution continues uninterrupted. |
+| `pause_at` | 0.95 (95%) | Emits a `budget.pause` checkpoint event. Execution suspends until the caller responds with `{"continue": True}`. The session is checkpointed automatically so the pause is durable. |
+| `stop_at` | 1.00 (100%) | Raises `BudgetExceeded`. The session is checkpointed before raising, so state is not lost. |
+
+## Basic Usage
+
+```python
+from isa_agent_sdk import query, ISAAgentOptions
+from isa_agent_sdk.guards import BudgetGuard
+
+guard = BudgetGuard(
+    max_credits=5.00,
+    max_tokens=200_000,
+    warn_at=0.80,
+    pause_at=0.95,
+    stop_at=1.00,
+)
+
+options = ISAAgentOptions(
+    session_id="analysis-session-001",
+    budget_guard=guard,
+)
+
+async for msg in query("Analyze every file in /data", options=options):
+    if msg.is_text:
+        print(msg.content, end="")
+```
+
+## Handling Pause and Stop Events
+
+### Responding to a Budget Pause
+
+When usage crosses `pause_at`, the agent emits a checkpoint event with `type="budget.pause"`. Handle it the same way as any other HIL checkpoint:
+
+```python
+from isa_agent_sdk import query, ISAAgentOptions
+from isa_agent_sdk.guards import BudgetGuard
+
+guard = BudgetGuard(max_credits=10.00, warn_at=0.80, pause_at=0.95)
+
+options = ISAAgentOptions(
+    session_id="batch-job-001",
+    budget_guard=guard,
+)
+
+async for msg in query("Process the full archive", options=options):
+    if msg.type == "budget.pause":
+        usage = msg.metadata
+        print(
+            f"Budget warning: ${usage['credits_used']:.4f} of "
+            f"${usage['max_credits']:.2f} used "
+            f"({usage['percent_used']:.1f}%)"
+        )
+        # Ask the user whether to continue
+        user_input = input("Continue? [y/N]: ")
+        await msg.respond({"continue": user_input.lower() == "y"})
+
+    elif msg.type == "budget.warn":
+        usage = msg.metadata
+        print(
+            f"[Budget] {usage['percent_used']:.0f}% used — "
+            f"${usage['credits_remaining']:.4f} remaining"
+        )
+
+    elif msg.is_text:
+        print(msg.content, end="")
+```
+
+### Catching BudgetExceeded
+
+```python
+from isa_agent_sdk import query, ISAAgentOptions
+from isa_agent_sdk.guards import BudgetGuard, BudgetExceeded
+
+guard = BudgetGuard(max_credits=2.00)
+
+options = ISAAgentOptions(
+    session_id="bounded-task-001",
+    budget_guard=guard,
+)
+
+try:
+    async for msg in query("Process everything", options=options):
+        if msg.is_text:
+            print(msg.content, end="")
+except BudgetExceeded as exc:
+    print(f"\nSession stopped: {exc}")
+    print(f"  Credits used:  ${exc.credits_used:.4f}")
+    print(f"  Tokens used:   {exc.tokens_used:,}")
+    print(f"  Session ID:    {exc.session_id}")
+    # Session is checkpointed — you can resume later with a higher budget
+```
+
+### Resuming After a Budget Stop
+
+Because `BudgetGuard` checkpoints state before raising `BudgetExceeded`, you can resume the session after adjusting the budget ceiling:
+
+```python
+from isa_agent_sdk import resume, ISAAgentOptions
+from isa_agent_sdk.guards import BudgetGuard
+
+# Resume with a larger budget
+new_guard = BudgetGuard(max_credits=10.00)
+
+options = ISAAgentOptions(budget_guard=new_guard)
+
+async for msg in resume("bounded-task-001", options=options):
+    if msg.is_text:
+        print(msg.content, end="")
+```
+
+## Token-Only Budget
+
+Set a token ceiling without a dollar limit when working with models that do not report pricing:
+
+```python
+from isa_agent_sdk.guards import BudgetGuard
+
+guard = BudgetGuard(
+    max_tokens=1_000_000,
+    warn_at=0.75,
+    pause_at=0.90,
+    stop_at=1.00,
+)
+```
+
+## Integration with Billing Metering
+
+`BudgetGuard` reads usage from the isA billing metering service after each model turn. The metering service accumulates:
+
+- **Prompt tokens** — tokens in the input context
+- **Completion tokens** — tokens generated by the model
+- **Credit cost** — USD equivalent based on the active model's pricing
+
+Usage is fetched via the internal `BillingMeter` client, which calls the platform metering API. No additional configuration is required beyond setting `ISA_METERING_URL` in your environment.
+
+```python
+# Environment variable required for billing integration
+# ISA_METERING_URL=http://localhost:8080  (set automatically in platform deployments)
+```
+
+If the metering service is unavailable, `BudgetGuard` falls back to tracking token counts from the raw model response headers and disables credit tracking with a warning log entry.
+
+## Checking Current Usage Programmatically
+
+```python
+from isa_agent_sdk.guards import BudgetGuard
+
+guard = BudgetGuard(max_credits=5.00, max_tokens=100_000)
+
+# After attaching to a session, inspect live usage:
+usage = await guard.get_usage(session_id="my-session")
+print(f"Credits used:    ${usage.credits_used:.4f} / ${usage.max_credits:.2f}")
+print(f"Tokens used:     {usage.tokens_used:,} / {usage.max_tokens:,}")
+print(f"Credit fraction: {usage.credit_fraction:.1%}")
+print(f"Token fraction:  {usage.token_fraction:.1%}")
+```
+
+## Best Practices
+
+1. **Always set a budget for autonomous agents** — tasks that loop over large datasets or call external APIs can accumulate cost quickly
+2. **Use `pause_at` for interactive sessions** — let users decide whether to continue rather than stopping abruptly
+3. **Use `stop_at` for unattended batch jobs** — guarantee a hard ceiling with no human in the loop
+4. **Set `warn_at` below `pause_at` by at least 0.10** — give yourself time to react before execution pauses
+5. **Handle `BudgetExceeded` at the call site** — the session is checkpointed, so the work is never lost
+6. **Combine credit and token limits** — use `max_tokens` as a safety net when pricing is uncertain
+
+## Next Steps
+
+- [Session Watchdog](./session-watchdog) — Detect stalled sessions alongside budget enforcement
+- [Checkpointing](./checkpointing) — Durable state that survives budget stops
+- [Human-in-the-Loop](./human-in-the-loop) — Approve budget overruns interactively

@@ -1,0 +1,204 @@
+# SessionWatchdog
+
+Detect stalled agent sessions and expose real-time liveness to external clients via NATS and Redis.
+
+## Overview
+
+Long-running agents can silently stall — no error is raised, no exception is thrown, execution simply stops making progress. `SessionWatchdog` monitors a running session and publishes periodic liveness signals so that clients and orchestrators can detect stalls and take corrective action (retry, alert, or escalate to a human).
+
+Liveness is published to two destinations in parallel:
+
+- **NATS** — `agent.liveness.{session_id}` topic for real-time event-driven clients
+- **Redis** — a key with a short TTL for clients that prefer polling
+
+## How It Works
+
+```
+Agent session running
+        │
+        ▼
+SessionWatchdog (background task)
+        │
+        ├── Every 30s: publish to NATS agent.liveness.{session_id}
+        ├── Every 30s: SET Redis key (TTL 60s)
+        │
+        ▼
+Stall detected (no progress for stall_timeout_secs)
+        │
+        ├── Emit stall event to NATS
+        └── Let Redis key expire (clients see absence = stalled)
+```
+
+## Configuration
+
+```python
+from isa_agent_sdk.guards import SessionWatchdog
+
+watchdog = SessionWatchdog(
+    session_id="my-task-123",
+    stall_timeout_secs=300,    # Stall threshold (default: 300s / 5 min)
+    heartbeat_interval_secs=30, # How often to publish liveness (default: 30s)
+    redis_ttl_secs=60,          # Redis key TTL (default: 60s — must be > heartbeat_interval)
+)
+```
+
+### Configuration Reference
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `session_id` | `str` | required | The session to monitor |
+| `stall_timeout_secs` | `int` | `300` | Seconds without progress before declaring a stall |
+| `heartbeat_interval_secs` | `int` | `30` | Frequency of liveness publications |
+| `redis_ttl_secs` | `int` | `60` | Redis key TTL — set higher than `heartbeat_interval_secs` |
+
+## Basic Usage
+
+Attach a watchdog to any long-running session:
+
+```python
+from isa_agent_sdk import query, ISAAgentOptions
+from isa_agent_sdk.guards import SessionWatchdog
+
+session_id = "batch-job-abc123"
+
+watchdog = SessionWatchdog(session_id=session_id)
+
+async with watchdog:
+    options = ISAAgentOptions(session_id=session_id)
+    async for msg in query("Process 10,000 records...", options=options):
+        if msg.is_text:
+            print(msg.content, end="")
+```
+
+The watchdog starts when entering the `async with` block and stops automatically on exit.
+
+## Liveness Payload
+
+Every heartbeat publishes the following JSON payload:
+
+```json
+{
+  "session_id": "batch-job-abc123",
+  "state": "running",
+  "uptime_secs": 142,
+  "credits_remaining": 8.43,
+  "current_task": "Processing chunk 47/200"
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `session_id` | `str` | The monitored session |
+| `state` | `str` | `running`, `stalled`, `completed`, or `error` |
+| `uptime_secs` | `int` | Seconds since session started |
+| `credits_remaining` | `float` | Remaining credit balance (requires BudgetGuard) |
+| `current_task` | `str` | Last reported task description from the agent |
+
+## NATS Topic Format
+
+```
+agent.liveness.{session_id}
+```
+
+Example: `agent.liveness.batch-job-abc123`
+
+Stall events are published to the same topic with `"state": "stalled"`.
+
+## Redis Key Format
+
+```
+agent:liveness:{session_id}
+```
+
+Example: `agent:liveness:batch-job-abc123`
+
+The value is the JSON liveness payload. The key expires after `redis_ttl_secs`. Absence of the key means the session has stalled or ended.
+
+## Client: Subscribing via NATS
+
+Use `LivenessSubscriber` to receive real-time updates:
+
+```python
+from isa_agent_sdk.guards import LivenessSubscriber
+
+subscriber = LivenessSubscriber(session_id="batch-job-abc123")
+
+async for event in subscriber.subscribe():
+    print(f"State: {event['state']}, uptime: {event['uptime_secs']}s")
+
+    if event["state"] == "stalled":
+        print("Session stalled — triggering alert")
+        await alert_oncall(event["session_id"])
+        break
+```
+
+## Client: Polling via Redis
+
+For clients without a NATS connection, poll Redis directly:
+
+```python
+import redis.asyncio as aioredis
+import json
+
+redis = aioredis.from_url("redis://localhost:6379")
+
+async def check_liveness(session_id: str) -> dict | None:
+    key = f"agent:liveness:{session_id}"
+    raw = await redis.get(key)
+    if raw is None:
+        return None  # Key expired — session stalled or ended
+    return json.loads(raw)
+
+# Poll every 45s (safely within the 60s TTL)
+import asyncio
+
+while True:
+    liveness = await check_liveness("batch-job-abc123")
+    if liveness is None:
+        print("Session appears stalled — key has expired")
+        break
+    print(f"State: {liveness['state']}, task: {liveness['current_task']}")
+    await asyncio.sleep(45)
+```
+
+## Combining with BudgetGuard
+
+`SessionWatchdog` and `BudgetGuard` compose cleanly:
+
+```python
+from isa_agent_sdk import query, ISAAgentOptions
+from isa_agent_sdk.guards import BudgetGuard, SessionWatchdog
+
+session_id = "long-job-xyz"
+
+budget = BudgetGuard(max_credits=5.00, warn_at=0.8, stop_at=1.0)
+watchdog = SessionWatchdog(session_id=session_id, stall_timeout_secs=120)
+
+async with budget, watchdog:
+    options = ISAAgentOptions(session_id=session_id, budget_guard=budget)
+    async for msg in query("Analyze all customer data...", options=options):
+        if msg.is_text:
+            print(msg.content, end="")
+```
+
+When `BudgetGuard` is present, `credits_remaining` in the liveness payload reflects the live balance.
+
+## Stall Detection Logic
+
+A session is considered stalled when the agent has not emitted a new token, tool call, or checkpoint event for `stall_timeout_secs` consecutive seconds. The watchdog tracks "last activity" via an internal monotonic clock updated on each SDK event.
+
+> **Note**: Legitimate pauses (waiting for a human-in-the-loop approval, waiting on a slow tool) count as inactivity. Set `stall_timeout_secs` generously if your workflow includes expected long pauses.
+
+## Environment Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `NATS_URL` | NATS server URL | `nats://localhost:4222` |
+| `REDIS_URL` | Redis connection URL | `redis://localhost:6379` |
+| `WATCHDOG_STALL_TIMEOUT` | Default stall timeout (seconds) | `300` |
+
+## Next Steps
+
+- [BudgetGuard](./budget-guard) — pair with cost/token limits
+- [Checkpointing](./checkpointing) — resume stalled sessions
+- [Human-in-the-Loop](./human-in-the-loop) — handle approval pauses gracefully

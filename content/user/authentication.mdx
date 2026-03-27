@@ -2,6 +2,14 @@
 
 Identity and access management services.
 
+> **⚠️ Breaking change in v0.7**: OAuth scopes have been renamed from `a2a.*` to `mcp:*`. Backward compatibility is preserved during the transition window, but update your integrations now. See the [scope migration guide](./scope-migration).
+
+## OAuth 2.0 Authorization Code Flow
+
+For third-party apps, browser-based clients, and mobile apps, use the OAuth 2.0 Authorization Code flow with PKCE. This is the recommended way to obtain access tokens on behalf of a user without handling their password.
+
+→ See the [OAuth 2.0 PKCE guide](./oauth-pkce) for the full implementation walkthrough.
+
 ## Overview
 
 Authentication in isA User is handled by four core services:

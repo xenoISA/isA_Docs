@@ -318,7 +318,122 @@ A discovery audit (2026-03-12) compared documentation against actual project act
 
 ---
 
-## 8. Future Phases (Backlog)
+## 8. Phase 5: v0.7 Content Sync — March 2026
+
+### 8.0 Problem Statement
+
+A discovery audit (2026-03-27) found that ~100 PRs merged across 10 repos in the last 30 days introduced six major undocumented epics. The changelog stops at v0.6 and no docs exist for the billing stack, the long-running agent hardening suite, the OAuth 2.0 authorization code flow, or the isA_Orch CLI.
+
+### 8.1 Sprint 1: OAuth 2.0 & Auth Scope Migration (P0)
+
+**Requirement**: Document the new OAuth 2.0 Authorization Code + PKCE flow and scope migration from `a2a.*` to `mcp:*`.
+
+**Acceptance Criteria**:
+- [ ] `content/user/oauth-pkce.mdx` — full PKCE flow with request/response examples
+- [ ] `content/user/scope-migration.mdx` — `a2a.*` → `mcp:*` mapping table + migration steps
+- [ ] `content/user/authentication.mdx` — updated with PKCE link + breaking-change callout
+- [ ] `content/mcp/security.mdx` — OAuth resource server (RFC 8707) section added
+- [ ] `content/console/index.mdx` — OAuth consent UI documented
+
+**Stories**:
+- Document OAuth 2.0 Authorization Code + PKCE flow (P0, api/sdk)
+- Write scope migration guide: a2a.* → mcp:* (P0, api/docs)
+- Update MCP security docs with RFC 8707 resource server (P1, docs)
+- Document OAuth consent UI in Console (P2, ui/docs)
+
+### 8.2 Sprint 2: Changelog Update (P0)
+
+**Requirement**: Update changelog with all v0.7 release entries across all active repos.
+
+**Acceptance Criteria**:
+- [ ] v0.7.0 release entry covers all 6 epics: Agent SDK hardening, Billing, OAuth, MCP scalability, Orch, Vibe multi-turn
+- [ ] Individual feature callouts for: BudgetGuard, SessionWatchdog, tiered memory, idempotency tokens, CommandGuard, connection pooling, scope migration, isa-orch CLI, Milvus backend, GraphRAG/RRF, AI copilot, deployment automation
+
+**Stories**:
+- Add v0.7 changelog entries covering all active epics (P0, docs)
+
+### 8.3 Sprint 3: Long-Running Agent Hardening (P0–P2)
+
+**Requirement**: Document the full agent hardening suite shipped in Epic #510.
+
+**Acceptance Criteria**:
+- [ ] `content/agent-sdk/memory.mdx` — tiered memory (working/episodic/semantic) with promotion diagram
+- [ ] `content/agent-sdk/budget-guard.mdx` — BudgetGuard config table (pause/warn/stop thresholds, max_credits/max_tokens)
+- [ ] `content/agent-sdk/session-watchdog.mdx` — SessionWatchdog + NATS liveness protocol, client polling example
+- [ ] `content/agent-sdk/checkpointing.mdx` — checkpoint compaction, GC, warm restart, tagged snapshots
+- [ ] `content/agent-sdk/tools.mdx` — idempotency tokens section
+- [ ] `content/agent-sdk/command-guard.mdx` — CommandGuard pattern list, bypass policy
+
+**Stories**:
+- Document tiered memory hierarchy in agent-sdk/memory.mdx (P0, sdk/docs)
+- Add BudgetGuard page to agent-sdk/ (P0, sdk/docs)
+- Add SessionWatchdog page to agent-sdk/ (P1, sdk/docs)
+- Update checkpointing page with compaction, GC, warm restart (P1, sdk/docs)
+- Document idempotency tokens in tools page (P1, sdk/docs)
+- Add CommandGuard page to agent-sdk/ (P2, sdk/docs)
+
+### 8.4 Sprint 4: isA_Orch Platform Code Index (P0–P2)
+
+**Requirement**: Expand the single-stub Orch page to full documentation for the platform CLI.
+
+**Acceptance Criteria**:
+- [ ] `content/orch/index.mdx` — expanded with architecture, indexing pipeline, language support
+- [ ] `content/orch/cli.mdx` — full `isa-orch` CLI reference (index, search, impact, stats, projects, project-context, test-scaffold)
+- [ ] `content/orch/semantic-search.mdx` — semantic search guide, sentence-transformers backend, `--semantic` flag
+- [ ] `content/orch/test-scaffold.mdx` — test directory scaffolding guide
+
+**Stories**:
+- Expand orch/index.mdx with full architecture and getting-started (P0, docs)
+- Write isa-orch CLI reference page (P0, docs)
+- Write semantic search guide (P1, docs)
+- Write test scaffold guide (P1, docs)
+
+### 8.5 Sprint 5: Platform Billing & Metering (P0–P2)
+
+**Requirement**: Document the entirely new billing infrastructure shipped in Epic #495.
+
+**Acceptance Criteria**:
+- [ ] `content/model/billing.mdx` — billing overview: meters, Redis reservation, credit alerts, NATS billing events
+- [ ] `content/model/metering.mdx` — `/api/v1/usage` endpoint, MeterType enum, cost attribution
+- [ ] `content/model/rbac.mdx` — per-resource RBAC, 11 resource types, `resource:action` model
+- [ ] `content/model/audit-logging.mdx` — immutable audit log via NATS JetStream, admin query endpoint
+- [ ] `content/model/api-reference.mdx` — billing/usage/RBAC endpoints added
+
+**Stories**:
+- Write billing overview page for model/ (P0, api/docs)
+- Write metering and usage API reference (P1, api/docs)
+- Write RBAC permission policies page (P1, api/docs)
+- Write audit logging page (P2, api/docs)
+
+### 8.6 Sprint 6: Data, Agent, Console & MCP Scalability (P1–P2)
+
+**Requirement**: Document individual feature gaps across four repos.
+
+**Acceptance Criteria**:
+- [ ] `content/data/rag-patterns.mdx` — Milvus backend, Hybrid GraphRAG/RRF added
+- [ ] `content/data/ai-copilot.mdx` — AI data dev copilot, `/api/v1/data/copilot` endpoint
+- [ ] `content/agents/index.mdx` — template management API, config versioning, audit trail
+- [ ] `content/agents/deployment.mdx` — canary/blue-green/rollback deployment automation
+- [ ] `content/mcp/configuration.mdx` — connection pooling (LRU, 30-connection cap), server priority tiers
+
+**Stories**:
+- Update rag-patterns.mdx with Milvus and GraphRAG/RRF (P1, docs)
+- Write AI data copilot page (P1, api/docs)
+- Update agents/index.mdx with template management and config versioning (P1, docs)
+- Write agents/deployment.mdx for canary/blue-green automation (P1, docs)
+- Update mcp/configuration.mdx with connection pooling (P1, docs)
+
+### 8.7 Out of Scope (This Phase)
+
+| Feature | Rationale |
+|---------|-----------|
+| isA_Vibe multi-turn dispatch docs | Vibe is internal tooling; user-facing docs not required yet |
+| isA_OS Argo Rollouts deep-dive | Covered by cloud/deployment.mdx at the ops level |
+| isA_Console Grafana dashboard embed | Console page is a stub — full console docs are a separate initiative |
+
+---
+
+## 9. Future Phases (Backlog)
 
 ### Phase 5: Developer Experience Polish
 
@@ -421,3 +536,4 @@ content/
 | 2026-03-03 | isA Team | Initial PRD created from product audit findings |
 | 2026-03-05 | isA Team | Added Phase 3: Production Readiness (14 stories, 3 themes) |
 | 2026-03-12 | isA Team | Added Phase 4: Content Sync (15 stories, 3 batches); fixed stale coverage table; added Creative + Marketing projects |
+| 2026-03-27 | isA Team | Added Phase 5: v0.7 Content Sync (29 stories, 6 sprints); discovery covered ~100 merged PRs across 10 repos |

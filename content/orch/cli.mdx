@@ -1,0 +1,370 @@
+# isa-orch CLI Reference
+
+Complete reference for all `isa-orch` command-line interface subcommands.
+
+## Installation
+
+```bash
+cd ~/Documents/Fun/isA/isA_Orch
+pip install -e .
+
+# Verify
+isa-orch --version
+```
+
+## Global Flags
+
+These flags apply to all subcommands:
+
+| Flag | Description |
+|------|-------------|
+| `--project <name>` | Scope command to a single project |
+| `--json` | Machine-readable JSON output |
+| `--verbose` | Show detailed progress and debug info |
+| `--help` | Show help for the command |
+
+---
+
+## `isa-orch index`
+
+Index all registered projects (or a specific one). Parses source files, extracts symbols and edges, and writes to the SQLite index.
+
+```bash
+isa-orch index [OPTIONS]
+```
+
+### Flags
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--project <name>` | all | Index only the named project |
+| `--full` | false | Force full re-index (ignore checksums) |
+| `--embeddings` | false | Generate semantic embeddings (requires sentence-transformers) |
+| `--verbose` | false | Show per-file progress |
+
+### Examples
+
+```bash
+# Index everything (incremental — skips unchanged files)
+isa-orch index
+
+# Index a single project
+isa-orch index --project isA_MCP
+
+# Force complete re-index
+isa-orch index --full
+
+# Index with semantic embeddings (slower first run)
+isa-orch index --embeddings
+
+# Index a project with embeddings and verbose output
+isa-orch index --project isA_Agent_SDK --embeddings --verbose
+```
+
+### Example Output
+
+```
+Indexing 19 projects...
+  isA_Agent_SDK  342 files  1,847 symbols  3,204 edges  [2.1s]
+  isA_MCP        198 files    923 symbols  1,502 edges  [1.3s]
+  isA_Console    156 files    612 symbols    891 edges  [0.9s]
+  ...
+Done. 19 projects, 8,421 symbols, 14,302 edges. [18.4s]
+```
+
+---
+
+## `isa-orch search`
+
+Search the index with full-text or semantic search.
+
+```bash
+isa-orch search <query> [OPTIONS]
+```
+
+### Flags
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--semantic` | false | Use vector embeddings instead of FTS5 |
+| `--kind <type>` | all | Filter by symbol kind: `function`, `class`, `method`, `variable` |
+| `--project <name>` | all | Scope search to one project |
+| `--limit <n>` | `20` | Max results to return |
+| `--json` | false | JSON output |
+
+### Examples
+
+```bash
+# Keyword search across all projects
+isa-orch search "tool_node"
+
+# Semantic search (requires --embeddings on index)
+isa-orch search "retry logic for failed network requests" --semantic
+
+# Find all classes named ToolNode
+isa-orch search "ToolNode" --kind class
+
+# Scoped to one project, JSON output
+isa-orch search "billing" --project isA_Model --json
+
+# Semantic + scoped
+isa-orch search "authentication middleware" --semantic --project isA_Cloud
+```
+
+### Example Output
+
+```
+Results for "ToolNode" (kind: class):
+
+  isA_Agent_SDK  isa_agent_sdk.nodes.tool_node.ToolNode
+    src/nodes/tool_node.py:42-128
+    "Executes MCP tools and handles tool call results"
+
+  isA_Agent      isa_agent.tools.ToolNode
+    src/tools.py:15-67
+    "Thin wrapper around SDK ToolNode for agent use"
+
+2 results in 2 projects [12ms]
+```
+
+---
+
+## `isa-orch impact`
+
+Trace the call graph of a symbol recursively across all projects. Shows every caller — direct and transitive — so you can understand blast radius before making changes.
+
+```bash
+isa-orch impact <symbol> [OPTIONS]
+```
+
+### Flags
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--max-depth <n>` | unlimited | Limit transitive traversal depth |
+| `--project <name>` | all | Scope to one project |
+| `--json` | false | JSON output |
+
+### Examples
+
+```bash
+# Impact analysis for a class
+isa-orch impact "ToolNode"
+
+# Limit depth to direct callers only
+isa-orch impact "ToolNode" --max-depth 1
+
+# Fully qualified name (unambiguous)
+isa-orch impact "isa_agent_sdk.nodes.tool_node.ToolNode"
+
+# JSON output for scripting
+isa-orch impact "BillingService" --json
+```
+
+### Example Output
+
+```
+Impact analysis for: ToolNode
+
+Direct callers (depth 1):
+  isA_Agent_SDK  AgentGraph.build()           src/graph.py:87
+  isA_Agent      PlannerAgent._run_tools()    src/agents/planner.py:145
+
+Transitive callers (depth 2):
+  isA_Agent      AgentRunner.execute()        src/runner.py:34
+  isA_Console    CLIHandler.handle_command()  src/cli/handler.ts:78
+
+Transitive callers (depth 3):
+  isA_Console    main()                       src/index.ts:12
+
+Total: 5 callers across 3 projects
+```
+
+---
+
+## `isa-orch stats`
+
+Show index statistics — total symbols, edges, projects, and language breakdown.
+
+```bash
+isa-orch stats [OPTIONS]
+```
+
+### Flags
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--project <name>` | all | Stats for one project only |
+| `--json` | false | JSON output |
+
+### Example Output
+
+```
+Platform Index Statistics
+
+Projects: 19
+Symbols:  41,203
+Edges:    68,902
+Database: ~/Documents/Fun/isA/.isa/code_index.db (124 MB)
+
+By language:
+  Python      34,821 symbols (84.5%)
+  TypeScript   6,382 symbols (15.5%)
+
+By kind:
+  function    18,402 (44.7%)
+  class        7,201 (17.5%)
+  method      12,400 (30.1%)
+  variable     3,200 (7.7%)
+
+Last indexed: 2026-03-27 14:32:01
+```
+
+---
+
+## `isa-orch projects`
+
+List all registered projects from `config/projects.yaml`.
+
+```bash
+isa-orch projects [OPTIONS]
+```
+
+### Flags
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--json` | false | JSON output |
+
+### Example Output
+
+```
+Registered projects (19):
+
+  isA_Agent_SDK   python   xenoISA/isA_Agent_SDK
+  isA_MCP         python   xenoISA/isA_MCP
+  isA_Model       python   xenoISA/isA_Model
+  isA_Console     typescript  xenoISA/isA_Console
+  ...
+```
+
+---
+
+## `isa-orch project-context`
+
+Auto-detect language, framework, test runner, and infrastructure for a project directory. Used internally by `/test`, `/codegen`, and isa-vibe to adapt output.
+
+```bash
+isa-orch project-context [PATH] [OPTIONS]
+```
+
+`PATH` defaults to the current directory.
+
+### Flags
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--json` | false | JSON output |
+
+### Example Output
+
+```
+Project context for: /Users/xenodennis/Documents/Fun/isA/isA_Agent_SDK
+
+Language:        Python 3.12
+Framework:       FastAPI
+Package manager: pip (pyproject.toml)
+Test runner:     pytest
+Test dirs:       tests/unit/, tests/component/, tests/integration/
+Existing layers: unit, component (missing: integration, api, smoke)
+DB migrations:   Alembic (alembic/)
+Docker:          Yes (Dockerfile)
+CI:              GitHub Actions (.github/workflows/)
+```
+
+---
+
+## `isa-orch test-scaffold`
+
+Create the 5-layer TDD test directory structure in a project. Idempotent — safe to run multiple times.
+
+```bash
+isa-orch test-scaffold [PATH] [OPTIONS]
+```
+
+`PATH` defaults to the current directory.
+
+### Flags
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--dry-run` | false | Show what would be created without creating |
+| `--json` | false | JSON output of created paths |
+
+### Examples
+
+```bash
+# Scaffold current directory
+isa-orch test-scaffold
+
+# Scaffold a specific project
+isa-orch test-scaffold ~/Documents/Fun/isA/isA_Agent_SDK
+
+# Preview without creating
+isa-orch test-scaffold --dry-run
+```
+
+### Example Output
+
+```
+Scaffolding test directories for: isA_Agent_SDK
+
+  ✓ tests/unit/          (created)
+  ✓ tests/component/     (created)
+  ✓ tests/integration/   (already exists — skipped)
+  ✓ tests/api/           (created)
+  ✓ tests/smoke/         (created)
+  ✓ tests/conftest.py    (created)
+
+Done. 4 directories created, 1 skipped.
+```
+
+---
+
+## `config/projects.yaml` Schema
+
+```yaml
+platform_root: ~/Documents/Fun/isA   # Absolute root of the isA monorepo
+
+projects:
+  - name: isA_Agent_SDK              # Project identifier (matches repo name)
+    description: Core agent framework with LangGraph nodes
+    language: python                  # python | typescript | go | rust
+    github: xenoISA/isA_Agent_SDK    # org/repo on GitHub
+
+  - name: isA_Console
+    description: Console/UI interfaces
+    language: typescript
+    github: xenoISA/isA_Console
+    include:                          # Optional: glob patterns to index
+      - "src/**/*.ts"
+      - "src/**/*.tsx"
+    exclude:                          # Optional: globs to skip
+      - "**/*.test.ts"
+      - "node_modules/**"
+```
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `name` | Yes | Project identifier — must match directory name under `platform_root` |
+| `language` | Yes | Primary language for parser selection |
+| `github` | No | GitHub remote for links in output |
+| `description` | No | Human-readable description |
+| `include` | No | Glob patterns to index (default: all source files) |
+| `exclude` | No | Glob patterns to skip |
+
+## Related
+
+- [Overview](./index) — Architecture and features
+- [Semantic Search](./semantic-search) — Vector-based search with `--semantic`
+- [Test Scaffolding](./test-scaffold) — `test-scaffold` command in depth

@@ -176,6 +176,105 @@ When using the agent as a [Steward](./steward), memory is used automatically to:
 - Store calendar context for scheduling
 - Maintain trigger conditions and alert history
 
+## Tiered Memory Architecture
+
+Sprint 3 (PR #528) replaced the flat `summary` string with a three-tier in-process memory model. The tiers mirror how humans consolidate experience: active context, recent episodes, and compressed long-term knowledge.
+
+```
+┌─────────────────────────────────────────────────────┐
+│              Agent State (LangGraph)                │
+│                                                     │
+│  ┌─────────────────┐                               │
+│  │  Working Memory │  ← current task context       │
+│  │  (messages[])   │    cleared when task ends     │
+│  └────────┬────────┘                               │
+│           │ summarize on overflow                  │
+│           ▼                                        │
+│  ┌─────────────────┐                               │
+│  │ Episodic Memory │  ← summary_chain[]            │
+│  │ (recent sessions│    one entry per episode      │
+│  │  as summaries)  │    rolling, incremental       │
+│  └────────┬────────┘                               │
+│           │ meta-compaction when threshold reached │
+│           ▼                                        │
+│  ┌─────────────────┐                               │
+│  │ Semantic Memory │  ← compressed knowledge       │
+│  │ (long-term,     │    persists across sessions   │
+│  │  compressed)    │    stored via MCP             │
+│  └─────────────────┘                               │
+└─────────────────────────────────────────────────────┘
+```
+
+### Memory Tiers
+
+| Tier | Scope | Backing Field | Lifecycle |
+|------|-------|---------------|-----------|
+| **Working** | Current task | `messages[]` | Cleared on task completion |
+| **Episodic** | Recent session history | `summary_chain[]` | Rolling summaries, pruned by threshold |
+| **Semantic** | Long-term compressed knowledge | MCP memory service | Persists across sessions |
+
+### New State Fields
+
+Three new fields were added to the agent state schema:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `summary_chain` | `list[str]` | Ordered list of episode summaries. Each entry is a compressed narrative of one past episode. |
+| `last_summary_index` | `int` | Pointer into the message log marking where the last incremental summary was taken. Used by rolling summarization to avoid re-summarizing already-processed messages. |
+| `meta_compaction_threshold` | `int` | Number of entries in `summary_chain` that triggers meta-compaction. When the chain exceeds this value, all episodes are compressed into a single semantic memory entry and the chain is reset. Default: `10`. |
+
+### Rolling Summarization
+
+Previous versions performed batch summarization — the full message history was compressed in one pass whenever context grew too large. Sprint 3 (PR #522) replaced this with progressive rolling summarization:
+
+1. After each exchange, new messages since `last_summary_index` are summarized into a new episode entry.
+2. The summary is appended to `summary_chain`.
+3. `last_summary_index` advances to the current end of the message log.
+4. Only the delta is processed, keeping summarization fast and predictable.
+
+### Meta-Compaction
+
+When `summary_chain` exceeds `meta_compaction_threshold`, meta-compaction fires:
+
+1. All entries in `summary_chain` are compressed into a single semantic memory artifact.
+2. The artifact is written to the MCP semantic memory store (see [Long-Term Memory](#long-term-memory-mcp)).
+3. `summary_chain` is reset to an empty list.
+4. `last_summary_index` is set to the current end of the message log.
+
+This prevents `summary_chain` from growing indefinitely while preserving durable knowledge in semantic memory.
+
+### Configuration Example
+
+```python
+from isa_agent_sdk import ISAAgentOptions
+
+options = ISAAgentOptions(
+    session_id="research-session-001",
+    # How many episode summaries to accumulate before compacting
+    # into semantic memory. Lower values reduce memory footprint;
+    # higher values preserve more short-term episodic detail.
+    meta_compaction_threshold=10,
+)
+```
+
+To inspect the current state of the memory tiers during a session:
+
+```python
+from isa_agent_sdk import get_session_state
+
+state = await get_session_state("research-session-001")
+
+# Episodic tier
+print(f"Episodes in chain: {len(state['summary_chain'])}")
+print(f"Last summary index: {state['last_summary_index']}")
+print(f"Compaction threshold: {state['meta_compaction_threshold']}")
+
+# Print each episode summary
+for i, episode in enumerate(state["summary_chain"]):
+    print(f"\n--- Episode {i + 1} ---")
+    print(episode)
+```
+
 ## Best Practices
 
 1. **Use session memory** for conversational context — it's automatic with `ISAAgentClient`
@@ -184,3 +283,4 @@ When using the agent as a [Steward](./steward), memory is used automatically to:
 4. **Set TTLs on working memory** to avoid stale context accumulating
 5. **Use factual memory** for structured facts (user preferences, project metadata)
 6. **Use episodic memory** for event logs (reviews, deployments, decisions)
+7. **Tune `meta_compaction_threshold`** based on session length — increase for long research sessions, decrease for short interactive tasks to keep memory lean

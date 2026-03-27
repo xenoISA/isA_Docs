@@ -8,6 +8,8 @@ Base URL: `http://localhost:8082`
 
 All requests require an API key via the `Authorization` header or `X-API-Key` header:
 
+> **RBAC**: When `RBAC_ENABLED=true`, each endpoint additionally requires a specific `resource:action` permission in the JWT. See [RBAC](./rbac) for the full permission matrix.
+
 ```bash
 curl -H "Authorization: Bearer YOUR_API_KEY" http://localhost:8082/api/v1/models
 ```
@@ -365,6 +367,60 @@ async with AsyncISAModel(base_url="http://localhost:8082") as client:
         stream=True
     ):
         print(chunk.choices[0].delta.content or "", end="")
+```
+
+## Billing & Usage Endpoints
+
+### GET `/api/v1/usage`
+
+Query credit balance and per-meter consumption. Requires `billing:read` permission.
+
+```bash
+curl "http://localhost:8082/api/v1/usage?since=2026-03-01T00:00:00Z" \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
+
+See [Metering & Usage API](./metering) for full parameter reference and response schema.
+
+### GET `/api/v1/audit`
+
+Query the immutable audit log for all write operations and auth events. Requires `audit_logs:read` permission.
+
+```bash
+curl "http://localhost:8082/api/v1/audit?resource=agents&limit=100" \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
+
+See [Audit Logging](./audit-logging) for full parameter reference.
+
+### DELETE `/api/v1/tenants/{id}`
+
+GDPR cascading tenant deletion — removes all data for the tenant across PG, Redis, Qdrant, and NATS. Requires `orgs:admin` permission.
+
+```bash
+curl -X DELETE "http://localhost:8082/api/v1/tenants/tenant_abc123" \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
+
+**Response:**
+
+```json
+{
+  "tenant_id": "tenant_abc123",
+  "status": "deletion_scheduled",
+  "estimated_completion": "2026-03-27T14:05:00Z"
+}
+```
+
+Deletion is async — data is soft-deleted immediately and hard-deleted by the weekly cleanup CronJob.
+
+### POST `/api/v1/tenants/{id}/gdpr-delete`
+
+Trigger immediate GDPR hard delete (bypasses the weekly CronJob). Requires `orgs:admin` permission.
+
+```bash
+curl -X POST "http://localhost:8082/api/v1/tenants/tenant_abc123/gdpr-delete" \
+  -H "Authorization: Bearer YOUR_API_KEY"
 ```
 
 ## Environment Variables
