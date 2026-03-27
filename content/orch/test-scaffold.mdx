@@ -1,0 +1,185 @@
+# Test Scaffolding
+
+Auto-detect your project stack and create the 5-layer TDD test directory structure in one command.
+
+## Overview
+
+`isa-orch test-scaffold` creates the standard isA test directory structure following the [TDD standard](/conventions#tdd-standard). It's idempotent — running it multiple times on a project that's already scaffolded is safe.
+
+```bash
+isa-orch test-scaffold [PATH]
+```
+
+`PATH` defaults to the current directory.
+
+## Step 1 — Detect Project Context
+
+Before scaffolding, understand your project's current state:
+
+```bash
+isa-orch project-context ./isA_Agent_SDK
+```
+
+```
+Project context for: isA_Agent_SDK
+
+Language:        Python 3.12
+Framework:       FastAPI
+Package manager: pip (pyproject.toml)
+Test runner:     pytest
+Test dirs found: tests/unit/, tests/component/
+Missing layers:  integration, api, smoke
+DB migrations:   Alembic (alembic/)
+Docker:          Yes (Dockerfile)
+CI:              GitHub Actions (.github/workflows/)
+```
+
+`project-context` reads:
+- `package.json` / `pyproject.toml` / `setup.py` → language and package manager
+- `pytest.ini` / `jest.config.*` → test runner
+- `Dockerfile` / `.github/` → infrastructure presence
+- Existing `tests/` subdirectory names → which layers already exist
+
+## Step 2 — Scaffold Test Directories
+
+```bash
+isa-orch test-scaffold ./isA_Agent_SDK
+```
+
+```
+Scaffolding test directories for: isA_Agent_SDK
+
+  ✓ tests/unit/          (already exists — skipped)
+  ✓ tests/component/     (already exists — skipped)
+  ✓ tests/integration/   (created)
+  ✓ tests/api/           (created)
+  ✓ tests/smoke/         (created)
+  ✓ tests/conftest.py    (created)
+
+Done. 3 directories created, 2 skipped.
+```
+
+## Generated Structure
+
+```
+tests/
+├── unit/           # L1: Pure functions, no I/O, no mocks needed
+│   └── .gitkeep
+├── component/      # L2: Classes/components with mocked dependencies
+│   └── .gitkeep
+├── integration/    # L3: Real DB, file I/O, multi-service interactions
+│   └── .gitkeep
+├── api/            # L4: HTTP endpoints, schema validation
+│   └── .gitkeep
+├── smoke/          # L5: Full user flows, end-to-end tests
+│   └── .gitkeep
+└── conftest.py     # Shared fixtures (empty template)
+```
+
+Generated `conftest.py` template:
+
+```python
+"""
+Shared pytest fixtures for all test layers.
+
+Conventions:
+  - L1 (unit/): no fixtures needed — pure functions only
+  - L2 (component/): mock external deps with pytest monkeypatch or MagicMock
+  - L3 (integration/): use tmp_path or in-memory SQLite; avoid production DBs
+  - L4 (api/): use test client (httpx.AsyncClient or FastAPI TestClient)
+  - L5 (smoke/): full server running; may use subprocess or docker-compose
+"""
+import pytest
+```
+
+## TypeScript / React Projects
+
+For TypeScript projects, scaffold creates Jest-compatible directories with placeholder config:
+
+```
+tests/
+├── unit/           # Jest unit tests
+├── component/      # React Testing Library component tests
+├── integration/    # Multi-component integration tests
+├── api/            # MSW (Mock Service Worker) API tests
+└── e2e/            # Playwright end-to-end tests
+```
+
+The `project-context` command detects `package.json` and sets up TypeScript-appropriate structure automatically.
+
+## Dry Run
+
+Preview what would be created without making changes:
+
+```bash
+isa-orch test-scaffold ./isA_Model --dry-run
+```
+
+```
+[DRY RUN] Would scaffold: isA_Model
+
+  - tests/unit/          (would create)
+  - tests/component/     (would create)
+  - tests/integration/   (already exists — would skip)
+  - tests/api/           (would create)
+  - tests/smoke/         (would create)
+  - tests/conftest.py    (would create)
+
+3 directories would be created, 1 skipped. Run without --dry-run to apply.
+```
+
+## Before and After — Python Project
+
+**Before** (no test structure):
+
+```
+isA_Agent_SDK/
+├── src/
+│   └── nodes/
+│       └── tool_node.py
+├── pyproject.toml
+└── README.md
+```
+
+**After** running `isa-orch test-scaffold`:
+
+```
+isA_Agent_SDK/
+├── src/
+│   └── nodes/
+│       └── tool_node.py
+├── tests/
+│   ├── conftest.py
+│   ├── unit/
+│   │   └── .gitkeep
+│   ├── component/
+│   │   └── .gitkeep
+│   ├── integration/
+│   │   └── .gitkeep
+│   ├── api/
+│   │   └── .gitkeep
+│   └── smoke/
+│       └── .gitkeep
+├── pyproject.toml
+└── README.md
+```
+
+Now run `/test src/nodes/tool_node.py` and the TDD skill will automatically detect the correct layers and place generated tests in the right directories.
+
+## Integration with Skills
+
+`isa-orch project-context` is called internally by:
+
+| Skill | How it uses context |
+|-------|-------------------|
+| `/test` | Detects language → selects pytest vs jest; detects existing layers → skips creating duplicate tests |
+| `/codegen` | Detects framework → generates code matching FastAPI vs Flask vs Express patterns |
+| `/run-tests` | Detects test runner → uses `pytest` vs `npm test` |
+| `isa-vibe` | Detects full stack → routes CDD/TDD to correct guide |
+
+After scaffolding, all skills work correctly without any manual configuration.
+
+## Related
+
+- [CLI Reference](./cli) — Full command reference including `project-context` and `test-scaffold` flags
+- [Overview](./index) — Platform architecture

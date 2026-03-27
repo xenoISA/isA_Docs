@@ -1,0 +1,166 @@
+# Metering & Usage API
+
+Query credit balances, consumption history, and cost breakdowns across your projects and API keys.
+
+## GET `/api/v1/usage`
+
+Returns current credit balance and per-meter consumption for the authenticated API key.
+
+```bash
+curl http://localhost:8082/api/v1/usage \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
+
+### Query Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `since` | `ISO 8601` | Filter usage after this timestamp |
+| `until` | `ISO 8601` | Filter usage before this timestamp |
+| `project_id` | `string` | Filter to a specific project |
+| `meter_type` | `string` | Filter to a specific `MeterType` |
+
+### Response
+
+```json
+{
+  "api_key": "isa_live_abc123",
+  "balance_credits": 842.7,
+  "consumed_credits": 157.3,
+  "overage_credits": 0,
+  "period": {
+    "since": "2026-03-01T00:00:00Z",
+    "until": "2026-03-27T23:59:59Z"
+  },
+  "meters": {
+    "TOKEN_INPUT": {
+      "count": 1200000,
+      "cost_credits": 18.0,
+      "unit": "per_1k_tokens"
+    },
+    "TOKEN_OUTPUT": {
+      "count": 310000,
+      "cost_credits": 18.6,
+      "unit": "per_1k_tokens"
+    },
+    "TOOL_CALL": {
+      "count": 2840,
+      "cost_credits": 14.2,
+      "unit": "per_call"
+    },
+    "STORAGE_READ": {
+      "count": 512,
+      "cost_credits": 5.12,
+      "unit": "per_mb"
+    },
+    "STORAGE_WRITE": {
+      "count": 128,
+      "cost_credits": 2.56,
+      "unit": "per_mb"
+    },
+    "PIPELINE_RUN": {
+      "count": 98,
+      "cost_credits": 98.0,
+      "unit": "per_run"
+    }
+  },
+  "by_project": {
+    "proj_abc123": {
+      "consumed_credits": 94.1,
+      "meters": { "TOKEN_INPUT": { "count": 650000, "cost_credits": 9.75 } }
+    },
+    "proj_def456": {
+      "consumed_credits": 63.2,
+      "meters": { "TOKEN_INPUT": { "count": 550000, "cost_credits": 8.25 } }
+    }
+  }
+}
+```
+
+### Response Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `balance_credits` | `float` | Remaining credit balance |
+| `consumed_credits` | `float` | Total credits consumed in the period |
+| `overage_credits` | `float` | Credits consumed beyond zero balance (if overage enabled) |
+| `meters` | `object` | Per-MeterType breakdown with count and cost |
+| `by_project` | `object` | Cost attribution by `project_id` |
+
+## Filtering by Date Range
+
+```bash
+# Usage for March 2026
+curl "http://localhost:8082/api/v1/usage?since=2026-03-01T00:00:00Z&until=2026-03-31T23:59:59Z" \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
+
+## Filtering by Project
+
+```bash
+# Usage for a specific project
+curl "http://localhost:8082/api/v1/usage?project_id=proj_abc123" \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
+
+## Filtering by Meter Type
+
+```bash
+# Only token usage
+curl "http://localhost:8082/api/v1/usage?meter_type=TOKEN_INPUT" \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
+
+## Internal Billing Hook Endpoints
+
+These endpoints are called by other isA services to report usage. They are **not intended for external callers** — use `GET /api/v1/usage` for querying.
+
+### POST `/api/v1/tools/usage` (called by isA_MCP)
+
+```json
+{
+  "tool_name": "web_search",
+  "execution_time_ms": 412,
+  "token_count": 0,
+  "api_key": "isa_live_abc123",
+  "project_id": "proj_abc123"
+}
+```
+
+### POST `/api/v1/storage/usage` (called by isA_OS)
+
+```json
+{
+  "operation_type": "read",
+  "bytes_transferred": 524288,
+  "object_count": 3,
+  "api_key": "isa_live_abc123",
+  "project_id": "proj_abc123"
+}
+```
+
+### POST `/api/v1/pipelines/usage` (called by isA_Data)
+
+```json
+{
+  "pipeline_id": "etl-customer-data-v2",
+  "records_processed": 50000,
+  "duration_ms": 28400,
+  "api_key": "isa_live_abc123",
+  "project_id": "proj_abc123"
+}
+```
+
+## Required Permissions
+
+| Endpoint | Required permission |
+|----------|-------------------|
+| `GET /api/v1/usage` | `billing:read` |
+| `POST /api/v1/*/usage` | Internal service token only |
+
+See [RBAC](./rbac) for permission configuration.
+
+## Next Steps
+
+- [Billing Overview](./billing) — credit system, alerts, and overage
+- [RBAC](./rbac) — restrict billing access by role

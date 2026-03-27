@@ -1,0 +1,154 @@
+# Semantic Search
+
+Find code by meaning rather than exact text — powered by local sentence-transformers embeddings, no external API required.
+
+## Overview
+
+The default `isa-orch search` uses SQLite FTS5 for fast keyword matching. Semantic search adds a vector embedding index so you can describe what you're looking for in natural language and find conceptually related code even when the exact words don't match.
+
+| | Keyword (FTS5) | Semantic |
+|--|---------------|---------|
+| Query | Exact tokens, substrings | Natural language descriptions |
+| Finds | Exact and partial name matches | Conceptually related symbols |
+| Miss | Synonyms, different naming | Exact but semantically unrelated names |
+| Speed | ~5ms | ~50ms (after index built) |
+| Setup | Always available | Requires `--embeddings` on index |
+| Best for | "Find `ToolNode`" | "Find retry logic for failed network calls" |
+
+## Enabling Semantic Search
+
+Semantic embeddings are opt-in. Build the embedding index by passing `--embeddings` during indexing:
+
+```bash
+# Build index with embeddings (first run: ~2-5 min for all 19 projects)
+isa-orch index --embeddings
+
+# Incremental update (only re-embeds changed files)
+isa-orch index --embeddings --project isA_Agent_SDK
+```
+
+After building, use `--semantic` on any search:
+
+```bash
+isa-orch search "retry logic for failed network requests" --semantic
+isa-orch search "authentication middleware" --semantic --project isA_Cloud
+isa-orch search "error handling in tool execution" --semantic --kind function
+```
+
+## Embedding Model
+
+Embeddings are generated locally using [sentence-transformers](https://www.sbert.net/):
+
+| Setting | Value |
+|---------|-------|
+| Model | `all-MiniLM-L6-v2` |
+| Dimensions | 384 |
+| Storage | SQLite BLOB columns alongside the FTS5 index |
+| Similarity | Cosine similarity |
+| Requires | `pip install sentence-transformers` |
+| External API | None — fully offline |
+
+The model is downloaded once (~80MB) from HuggingFace on first use and cached at `~/.cache/huggingface/`.
+
+## First-Run Performance
+
+The first `index --embeddings` pass embeds every symbol in the platform — this takes longer than a normal index:
+
+```
+First embedding run (19 projects, ~41K symbols):
+  Embedding generation: ~3-5 minutes on CPU, ~30s on GPU
+  SQLite write: ~20 seconds
+  Total: ~4-6 minutes
+
+Subsequent incremental runs (only changed files):
+  Typically < 30 seconds
+```
+
+Progress is shown during indexing:
+
+```
+Generating embeddings for isA_Agent_SDK...
+  [████████░░░░░░░░] 847/1847 symbols (45.9%) ...
+```
+
+## How Embeddings Update
+
+When you re-index after code changes:
+
+1. Files with the same MD5 checksum are skipped (no re-parsing, no re-embedding)
+2. Changed files are re-parsed and their symbols re-embedded
+3. Deleted files have their embeddings removed from the index
+4. New files are parsed and embedded
+
+This means incremental `isa-orch index --embeddings` is fast — it only processes what changed.
+
+## Use Cases
+
+### Finding Implementations by Description
+
+```bash
+# Find all implementations of rate limiting
+isa-orch search "rate limiting with sliding window" --semantic
+
+# Find authentication-related code
+isa-orch search "verify JWT token signature" --semantic
+
+# Find error recovery patterns
+isa-orch search "exponential backoff retry" --semantic
+```
+
+### Discovering Similar Code Across Projects
+
+```bash
+# Find all places that handle billing events
+isa-orch search "process billing events from queue" --semantic
+
+# Find similar caching implementations
+isa-orch search "cache with TTL expiration" --semantic
+```
+
+### Combining with Other Filters
+
+```bash
+# Semantic search scoped to one project
+isa-orch search "connection pool management" --semantic --project isA_MCP
+
+# Semantic search for classes only
+isa-orch search "database session factory" --semantic --kind class
+
+# Top 5 results as JSON
+isa-orch search "checkpoint compaction" --semantic --limit 5 --json
+```
+
+## Result Ranking
+
+Semantic results are ranked by cosine similarity (0.0–1.0). Results with similarity below 0.35 are filtered out. The `--json` output includes the score:
+
+```json
+[
+  {
+    "symbol": "isa_agent_sdk.services.persistence.CheckpointCompactor",
+    "kind": "class",
+    "project": "isA_Agent_SDK",
+    "file": "src/services/persistence/compaction.py",
+    "line_start": 42,
+    "similarity": 0.87,
+    "docstring": "Prunes old checkpoints while preserving tagged snapshots."
+  }
+]
+```
+
+## Requirements
+
+```bash
+# Install sentence-transformers
+pip install sentence-transformers
+
+# Verify model downloads correctly
+python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('all-MiniLM-L6-v2')"
+```
+
+## Related
+
+- [CLI Reference](./cli) — Full `isa-orch search` flag reference
+- [Overview](./index) — Architecture and all features

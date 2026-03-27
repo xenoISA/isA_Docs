@@ -36,3 +36,106 @@ async for msg in query("Your prompt", options=options):
 ```
 
 See the [Agent SDK documentation](/agent-sdk) for details.
+
+## Template Management
+
+Reuse common agent configurations with templates. Templates are versioned, categorized, and support rollback.
+
+### Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/api/v1/templates` | Create a template |
+| `GET` | `/api/v1/templates` | List templates (filter by `?category=` or `?tag=`) |
+| `GET` | `/api/v1/templates/{id}` | Get a template |
+| `PUT` | `/api/v1/templates/{id}` | Update a template (creates a new version) |
+| `DELETE` | `/api/v1/templates/{id}` | Delete (builtin templates are undeletable) |
+| `GET` | `/api/v1/templates/{id}/versions` | List version history |
+| `POST` | `/api/v1/templates/{id}/rollback` | Rollback to a previous version |
+
+### Built-in Templates
+
+8 builtin templates are pre-loaded and cannot be deleted:
+
+| Category | Templates |
+|----------|-----------|
+| `analysis` | `data-analyst`, `report-writer` |
+| `code` | `code-reviewer`, `debugger` |
+| `writing` | `content-creator`, `editor` |
+| `research` | `researcher` |
+| `support` | `customer-support` |
+
+### Example
+
+```bash
+# List templates in the "code" category
+curl "http://localhost:8085/api/v1/templates?category=code" \
+  -H "Authorization: Bearer YOUR_API_KEY"
+
+# Create a custom template
+curl -X POST http://localhost:8085/api/v1/templates \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -d '{
+    "name": "Python Expert",
+    "category": "code",
+    "tags": ["python", "backend"],
+    "config": {
+      "system_prompt": "You are an expert Python engineer...",
+      "allowed_tools": ["read_file", "write_file", "execute_bash"],
+      "max_tokens": 4096
+    }
+  }'
+```
+
+## Config Versioning
+
+Every create or update to an agent config automatically creates an immutable snapshot. Roll back to any previous version without losing history.
+
+```bash
+# List all versions for an agent
+curl http://localhost:8085/api/v1/agents/agent_abc123/versions \
+  -H "Authorization: Bearer YOUR_API_KEY"
+
+# Get a specific version
+curl http://localhost:8085/api/v1/agents/agent_abc123/versions/3 \
+  -H "Authorization: Bearer YOUR_API_KEY"
+
+# Rollback to version 3
+curl -X POST http://localhost:8085/api/v1/agents/agent_abc123/rollback \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -d '{"version": 3}'
+```
+
+## Audit Trail
+
+Every config change is recorded with field-level diffs. The audit trail persists even after the agent config is deleted.
+
+```bash
+# Get audit log for an agent
+curl http://localhost:8085/api/v1/agents/agent_abc123/audit \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
+
+**Response:**
+
+```json
+{
+  "entries": [
+    {
+      "timestamp": "2026-03-27T14:00:00Z",
+      "action": "update",
+      "user_id": "user_xyz",
+      "changed_fields": ["system_prompt", "max_tokens"],
+      "old_values": {"system_prompt": "...", "max_tokens": 2048},
+      "new_values": {"system_prompt": "...", "max_tokens": 4096}
+    }
+  ],
+  "total": 12
+}
+```
+
+The audit store retains up to 1,000 entries per agent (oldest entries are pruned beyond this limit).
+
+## Deployment Automation
+
+Deploy agent versions with canary, blue-green, or rolling strategies. See the [deployment guide](./deployment) for the full API reference and step-by-step walkthrough.

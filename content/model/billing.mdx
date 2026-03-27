@@ -1,0 +1,161 @@
+# Billing & Credits
+
+The isA Model Service includes a complete billing infrastructure for tracking API usage, enforcing credit limits, and attributing costs across projects and API keys.
+
+## Overview
+
+All API calls consume credits. Credits are deducted atomically at request time via a Redis reservation, then finalized after execution. This ensures accurate accounting even under concurrent load and prevents overspending.
+
+```
+Request arrives
+      │
+      ▼
+Atomic Redis reservation (Lua script)
+      │
+      ├── Insufficient credits → 402 Payment Required
+      │
+      ▼
+Execute request
+      │
+      ▼
+Finalize usage → emit NATS billing event → update balance
+      │
+      ▼
+Credit alert (if balance < alert_threshold_credits)
+```
+
+## Credits
+
+Credits are the billing unit for all isA platform services.
+
+| Conversion | Rate |
+|-----------|------|
+| 1 credit | $0.001 USD |
+| 1,000 credits | $1.00 USD |
+
+Credits are pre-purchased and drawn down as you use the platform. When credits run out, requests are rejected with `402 Payment Required` unless overage is configured.
+
+## Meter Types
+
+Every billable operation is tracked against a `MeterType`:
+
+| MeterType | Triggered by | Unit |
+|-----------|-------------|------|
+| `TOKEN_INPUT` | Input tokens sent to model | per 1K tokens |
+| `TOKEN_OUTPUT` | Output tokens generated | per 1K tokens |
+| `TOOL_CALL` | MCP tool execution | per call |
+| `STORAGE_READ` | MinIO/storage reads | per MB |
+| `STORAGE_WRITE` | MinIO/storage writes | per MB |
+| `PIPELINE_RUN` | isA_Data pipeline execution | per run |
+
+Example costs (illustrative — check your plan for actual rates):
+
+| MeterType | Example cost |
+|-----------|-------------|
+| `TOKEN_INPUT` | 0.15 credits / 1K tokens |
+| `TOKEN_OUTPUT` | 0.60 credits / 1K tokens |
+| `TOOL_CALL` | 0.5 credits / call |
+| `STORAGE_READ` | 0.01 credits / MB |
+| `STORAGE_WRITE` | 0.02 credits / MB |
+| `PIPELINE_RUN` | 1.0 credits / run |
+
+## Credit Alerts
+
+Configure a threshold below which a NATS alert is published:
+
+```bash
+# Environment variable
+BILLING_ALERT_THRESHOLD_CREDITS=100
+```
+
+Alert events are published to the `billing.alerts.{api_key}` NATS topic:
+
+```json
+{
+  "event": "low_balance",
+  "api_key": "isa_live_abc123",
+  "balance_credits": 87.4,
+  "threshold_credits": 100,
+  "timestamp": "2026-03-27T12:00:00Z"
+}
+```
+
+Subscribe to alerts in your application:
+
+```python
+import nats
+
+nc = await nats.connect("nats://localhost:4222")
+sub = await nc.subscribe("billing.alerts.isa_live_abc123")
+
+async for msg in sub.messages:
+    alert = json.loads(msg.data)
+    if alert["event"] == "low_balance":
+        await notify_team(f"Credits low: {alert['balance_credits']} remaining")
+```
+
+## Overage Configuration
+
+By default, requests fail when credits reach zero. Configure an overage allowance to continue beyond zero (billed at the end of the period):
+
+```bash
+BILLING_OVERAGE_LIMIT_CREDITS=500   # Allow up to 500 credits of overage
+```
+
+When overage is active, responses include a header:
+
+```
+X-ISA-Overage-Credits: 42.3
+```
+
+## Dead Letter Queue
+
+Billing events that fail to persist (e.g., during a database outage) are written to the `billing-dlq-stream` NATS JetStream:
+
+```bash
+# Inspect DLQ
+nats stream info billing-dlq-stream
+
+# Replay failed events (admin only)
+nats consumer create billing-dlq-stream --deliver all
+```
+
+## Cost Attribution
+
+Costs are attributed to both a `project_id` and an `api_key`. Pass `X-Project-ID` in requests to enable project-level reporting:
+
+```bash
+curl -X POST http://localhost:8082/api/v1/invoke \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "X-Project-ID: proj_abc123" \
+  -d '{"model": "gpt-4o-mini", "messages": [...]}'
+```
+
+See [Metering & Usage API](./metering) for querying cost breakdown by project and API key.
+
+## Billing Hooks (Internal Services)
+
+Other isA services report usage to the Model Service via internal billing hooks. These endpoints are not for external use.
+
+| Service | Endpoint | Triggered by |
+|---------|----------|-------------|
+| isA_MCP | `POST /api/v1/tools/usage` | Every MCP tool execution |
+| isA_OS | `POST /api/v1/storage/usage` | Every MinIO read/write |
+| isA_Data | `POST /api/v1/pipelines/usage` | Every pipeline run |
+
+## Environment Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `BILLING_ENABLED` | Enable/disable billing | `true` |
+| `BILLING_ALERT_THRESHOLD_CREDITS` | Low-balance alert threshold | `100` |
+| `BILLING_OVERAGE_LIMIT_CREDITS` | Overage allowance (0 = no overage) | `0` |
+| `BILLING_PRICING_CACHE_TTL_SECS` | Pricing cache duration | `300` |
+| `NATS_URL` | NATS server for billing events | `nats://localhost:4222` |
+| `REDIS_URL` | Redis for atomic reservations | `redis://localhost:6379` |
+
+## Next Steps
+
+- [Metering & Usage API](./metering) — query usage and cost breakdowns
+- [RBAC](./rbac) — control who can access billing endpoints
+- [Audit Logging](./audit-logging) — immutable log of all billing events

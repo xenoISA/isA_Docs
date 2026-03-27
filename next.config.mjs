@@ -14,6 +14,9 @@ export default withNextra({
   basePath: '/docs',
   reactStrictMode: true,
   output: 'standalone',
+  eslint: {
+    dirs: ['app', 'components', 'lib'],
+  },
   webpack: (config) => {
     config.resolve.alias = {
       ...config.resolve.alias,

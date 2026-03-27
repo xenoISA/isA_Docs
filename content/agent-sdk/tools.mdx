@@ -12,6 +12,60 @@ Tools enable agents to:
 - Access databases
 - And much more...
 
+## Idempotency Tokens
+
+Tool calls that are replayed during checkpoint resume (e.g., after a crash) would normally execute twice, causing duplicate side effects — sending an email again, writing a record twice, charging a customer a second time.
+
+Idempotency tokens prevent this. Each tool call is assigned a SHA-256 hash of its `tool_call_id` + arguments. The hash is stored in Redis with a TTL. If the same hash is seen again within the TTL window, the tool's cached result is returned immediately without re-executing.
+
+### How It Works
+
+```
+Tool call received
+      │
+      ▼
+Compute SHA-256(tool_call_id + args)
+      │
+      ├── Key exists in Redis → return cached result (no re-execution)
+      │
+      ▼
+Execute tool
+      │
+      ▼
+Store result in Redis (key: isa:idempotency:{hash}, TTL: idempotency_ttl_secs)
+```
+
+### Configuration
+
+Idempotency tokens are enabled by default when `REDIS_URL` is configured:
+
+```bash
+TOOL_IDEMPOTENCY_ENABLED=true          # Enable idempotency (default: true)
+TOOL_IDEMPOTENCY_TTL_SECS=3600         # Cache window in seconds (default: 3600 = 1 hour)
+```
+
+### Opting Out Per Tool
+
+For tools where re-execution is safe (e.g., pure read operations), you can disable idempotency:
+
+```python
+from isa_agent_sdk import query, ISAAgentOptions
+
+options = ISAAgentOptions(
+    idempotency_exempt_tools=["web_search", "read_file"]  # Always re-execute these
+)
+```
+
+### Redis Key Format
+
+```
+isa:idempotency:{sha256_hash}
+```
+
+The value is the serialized tool result. Key expires after `TOOL_IDEMPOTENCY_TTL_SECS`.
+
+> **Note**: Idempotency tokens protect against double-execution during checkpoint replay. They do not prevent a user from explicitly calling the same tool twice with the same arguments — only automatic replays are de-duplicated.
+
 ## Tool Discovery
 
 ### List Available Tools

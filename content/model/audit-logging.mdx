@@ -1,0 +1,169 @@
+# Audit Logging
+
+Immutable, append-only audit log for all write operations, config changes, and authentication events — stored in NATS JetStream.
+
+## Overview
+
+Every mutating operation in the isA Model Service is recorded to an audit log. The log is:
+
+- **Immutable** — entries are append-only; existing entries cannot be modified or deleted
+- **Non-blocking** — the `AuditPublisher` fires-and-forgets to NATS; request latency is not affected
+- **Durable** — stored in NATS JetStream (`audit-log-stream`) with configurable retention
+- **Queryable** — admin endpoint for filtering by resource, user, date range
+
+## What's Logged
+
+| Event category | Examples |
+|---------------|---------|
+| Write operations | Create/update/delete agents, templates, deployments |
+| Auth events | Token issuance, permission denied, API key created/revoked |
+| Billing events | Credit purchases, overage triggered, alert threshold crossed |
+| Admin operations | Tenant deletion, RBAC changes, bulk operations |
+| Config changes | Environment variable updates, feature flag changes |
+
+## Audit Log Entry Schema
+
+```json
+{
+  "id": "aud_01HXYZ123456",
+  "timestamp": "2026-03-27T14:32:01.234Z",
+  "user_id": "user_abc123",
+  "api_key": "isa_live_abc123",
+  "action": "agents.update",
+  "resource_type": "agents",
+  "resource_id": "agent_def456",
+  "changed_fields": ["system_prompt", "max_tokens"],
+  "old_values": {
+    "system_prompt": "You are a helpful assistant.",
+    "max_tokens": 2048
+  },
+  "new_values": {
+    "system_prompt": "You are a coding assistant specialized in Python.",
+    "max_tokens": 4096
+  },
+  "ip": "203.0.113.42",
+  "user_agent": "isA-SDK/1.4.2 Python/3.12",
+  "project_id": "proj_abc123",
+  "result": "success"
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | `string` | Unique audit entry ID |
+| `timestamp` | `ISO 8601` | When the event occurred (UTC) |
+| `user_id` | `string` | Authenticated user |
+| `api_key` | `string` | API key used (masked: last 4 chars shown) |
+| `action` | `string` | Dot-namespaced action: `{resource}.{verb}` |
+| `resource_type` | `string` | One of the 11 RBAC resource types |
+| `resource_id` | `string` | The specific resource affected |
+| `changed_fields` | `string[]` | Fields that changed (write ops only) |
+| `old_values` | `object` | Previous values (write ops only) |
+| `new_values` | `object` | Updated values (write ops only) |
+| `ip` | `string` | Client IP address |
+| `result` | `string` | `success` or `error` |
+
+## Querying the Audit Log
+
+### GET `/api/v1/audit`
+
+Requires `audit_logs:read` permission.
+
+```bash
+curl "http://localhost:8082/api/v1/audit?resource=agents&limit=50" \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
+
+### Query Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `resource` | `string` | Filter by `resource_type` |
+| `resource_id` | `string` | Filter to a specific resource |
+| `user_id` | `string` | Filter by user |
+| `action` | `string` | Filter by action (e.g., `agents.update`) |
+| `since` | `ISO 8601` | Start of time range |
+| `until` | `ISO 8601` | End of time range |
+| `result` | `string` | `success` or `error` |
+| `limit` | `int` | Max entries to return (default: 100, max: 1000) |
+| `offset` | `int` | Pagination offset |
+
+### Example Responses
+
+```json
+{
+  "entries": [
+    {
+      "id": "aud_01HXYZ123456",
+      "timestamp": "2026-03-27T14:32:01.234Z",
+      "action": "agents.update",
+      "resource_type": "agents",
+      "resource_id": "agent_def456",
+      "user_id": "user_abc123",
+      "changed_fields": ["system_prompt"],
+      "result": "success"
+    }
+  ],
+  "total": 142,
+  "limit": 50,
+  "offset": 0
+}
+```
+
+### Common Queries
+
+```bash
+# All failed operations in the last 24 hours
+curl "http://localhost:8082/api/v1/audit?result=error&since=2026-03-26T00:00:00Z" \
+  -H "Authorization: Bearer YOUR_API_KEY"
+
+# All changes to a specific agent
+curl "http://localhost:8082/api/v1/audit?resource=agents&resource_id=agent_def456" \
+  -H "Authorization: Bearer YOUR_API_KEY"
+
+# All actions by a specific user
+curl "http://localhost:8082/api/v1/audit?user_id=user_abc123&limit=200" \
+  -H "Authorization: Bearer YOUR_API_KEY"
+
+# All billing events
+curl "http://localhost:8082/api/v1/audit?resource=billing" \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
+
+## NATS JetStream Storage
+
+Audit events are stored in the `audit-log-stream` NATS JetStream stream:
+
+```bash
+# Inspect stream
+nats stream info audit-log-stream
+
+# View recent entries
+nats stream view audit-log-stream --count 10
+```
+
+### Retention Policy
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| Storage | File (disk) | Persisted to disk, survives restarts |
+| Retention | Limits | Keeps up to `max_bytes` or `max_age` |
+| Max age | 2 years | Entries older than 2 years are pruned |
+| Max bytes | 10 GB | Oldest entries pruned when size limit reached |
+
+## GDPR & Tenant Deletion
+
+When a tenant is deleted (`DELETE /api/v1/tenants/{id}`), audit logs are **retained** for the GDPR-mandated period (7 years by default) then automatically purged via the weekly cleanup CronJob. Audit entries related to PII are anonymized (user identifiers replaced with a hash) but the event record itself is preserved.
+
+Configure retention:
+
+```bash
+AUDIT_LOG_RETENTION_YEARS=7        # How long to keep audit entries
+AUDIT_LOG_ANONYMIZE_ON_DELETE=true # Anonymize PII on tenant deletion
+```
+
+## Next Steps
+
+- [RBAC](./rbac) — control who can read audit logs
+- [Billing Overview](./billing) — billing events in the audit log
+- [Metering API](./metering) — usage data (separate from audit log)

@@ -1,0 +1,138 @@
+# Scope Migration: a2a.* → mcp:*
+
+> **Breaking change in v0.7**: OAuth scopes have been renamed from the `a2a.*` namespace to `mcp:*`. Backward compatibility is maintained during the transition window, but all new integrations should use `mcp:*` scopes.
+
+## What Changed
+
+In v0.7, isA adopted the [Model Context Protocol](https://modelcontextprotocol.io) naming convention for OAuth scopes. The `a2a.*` scope prefix (agent-to-agent) is replaced with `mcp:*` (Model Context Protocol).
+
+The change affects:
+- OAuth token requests (`scope` parameter)
+- API key permissions
+- Authorization Server metadata (`/.well-known/oauth-authorization-server`)
+- MCP Resource Server metadata (`/.well-known/oauth-protected-resource`)
+
+## Scope Mapping Table
+
+| Old scope (`a2a.*`) | New scope (`mcp:*`) | Description |
+|--------------------|---------------------|-------------|
+| `a2a.tools.execute` | `mcp:tools:execute` | Execute any MCP tool |
+| `a2a.tools.read` | `mcp:tools:read` | Read tool metadata and schemas |
+| `a2a.admin.servers` | `mcp:admin:servers` | Manage MCP server registrations |
+| `a2a.admin.tenants` | `mcp:admin:tenants` | Multi-tenant admin operations |
+| `a2a.resources.read` | `mcp:resources:read` | Read MCP resources |
+| `a2a.resources.write` | `mcp:resources:write` | Write MCP resources |
+
+## Backward Compatibility
+
+Old `a2a.*` scopes continue to work during the transition window. The auth middleware automatically normalizes `a2a.*` → `mcp:*` scopes in all token requests and JWT claims.
+
+```
+POST /oauth/token
+scope=a2a.tools.execute a2a.resources.read
+
+→ Internally normalized to:
+scope=mcp:tools:execute mcp:resources:read
+```
+
+Tokens issued with `a2a.*` scopes will still be validated correctly at the MCP resource server.
+
+> **Transition window**: The `a2a.*` → `mcp:*` normalization will be removed in v0.9. Migrate before then to avoid breaking changes.
+
+## How to Migrate
+
+### 1. Update OAuth token requests
+
+```python
+# Before
+scope = "a2a.tools.execute a2a.resources.read"
+
+# After
+scope = "mcp:tools:execute mcp:resources:read"
+```
+
+```bash
+# Before
+-d "scope=a2a.tools.execute+a2a.admin.servers"
+
+# After
+-d "scope=mcp%3Atools%3Aexecute+mcp%3Aadmin%3Aservers"
+```
+
+### 2. Update SDK configuration
+
+```python
+from isa_agent_sdk import ISAAgentOptions
+
+# Before
+options = ISAAgentOptions(scopes=["a2a.tools.execute"])
+
+# After
+options = ISAAgentOptions(scopes=["mcp:tools:execute"])
+```
+
+### 3. Update API key scopes
+
+If you use API keys with explicit scope restrictions, update them via the API:
+
+```bash
+curl -X PATCH https://auth.isa.ai/api/v1/api-keys/key_abc123 \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "scopes": ["mcp:tools:execute", "mcp:resources:read"]
+  }'
+```
+
+### 4. Verify your JWT claims
+
+After migrating, inspect a newly issued token to confirm scopes are correct:
+
+```python
+import jwt
+import json
+
+token = "eyJhbGciOiJSUzI1NiJ9..."
+# Decode without verification to inspect claims (for debugging only)
+claims = jwt.decode(token, options={"verify_signature": False})
+print(json.dumps(claims.get("permissions", []), indent=2))
+# Should show: ["mcp:tools:execute", "mcp:resources:read"]
+```
+
+## MCP Scope Descriptions
+
+These are the human-readable descriptions shown on the OAuth consent screen:
+
+| Scope | Consent screen label | What it allows |
+|-------|---------------------|----------------|
+| `mcp:tools:execute` | "Execute tools" | Run any of the 190+ MCP tools on your behalf |
+| `mcp:tools:read` | "View tool catalog" | List available tools and read their schemas |
+| `mcp:resources:read` | "Read resources" | Access MCP resources (files, data) |
+| `mcp:resources:write` | "Modify resources" | Create and update MCP resources |
+| `mcp:admin:servers` | "Manage MCP servers" | Register and configure MCP server connections |
+| `mcp:admin:tenants` | "Tenant administration" | Manage multi-tenant configuration |
+
+## Checking Scope Support
+
+The Authorization Server metadata endpoint lists all supported scopes:
+
+```bash
+curl https://auth.isa.ai/.well-known/oauth-authorization-server | jq '.scopes_supported'
+```
+
+```json
+[
+  "mcp:tools:execute",
+  "mcp:tools:read",
+  "mcp:resources:read",
+  "mcp:resources:write",
+  "mcp:admin:servers",
+  "mcp:admin:tenants"
+]
+```
+
+## Next Steps
+
+- [OAuth 2.0 PKCE Flow](./oauth-pkce) — implement the Authorization Code flow
+- [Authentication](./authentication) — JWT and API key authentication
+- [MCP Security](../mcp/security) — how scopes are enforced at the MCP layer

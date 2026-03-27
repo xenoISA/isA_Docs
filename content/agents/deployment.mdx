@@ -1,0 +1,214 @@
+# Agent Deployment Automation
+
+Deploy agents using canary, blue-green, or rolling strategies with promote, rollback, and status endpoints.
+
+## Overview
+
+The isA Agent service includes deployment automation for controlled rollouts. Instead of switching all traffic to a new agent version instantly, you can use progressive traffic shifting (canary), zero-downtime slot switching (blue-green), or gradual pod replacement (rolling).
+
+```
+POST /api/v1/deployments
+```
+
+## Deployment Strategies
+
+| Strategy | How it works | Best for |
+|----------|-------------|---------|
+| **Canary** | Starts at 10% traffic, promote in 25% increments | Risk-averse feature releases |
+| **Blue-Green** | Two identical environments, instant cutover | Zero-downtime releases |
+| **Rolling** | Replaces pods one-by-one (Argo Rollouts) | Standard updates, large fleets |
+
+## API Reference
+
+### POST `/api/v1/deployments` — Configure Deployment
+
+```bash
+curl -X POST http://localhost:8085/api/v1/deployments \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "agent_id": "agent_abc123",
+    "strategy": "CANARY",
+    "config": {
+      "new_version": "v2.1.0",
+      "initial_traffic_percent": 10,
+      "promote_increment": 25,
+      "health_check_interval_secs": 60,
+      "auto_rollback_on_error_rate": 0.05
+    }
+  }'
+```
+
+**Response:**
+
+```json
+{
+  "deployment_id": "deploy_xyz789",
+  "agent_id": "agent_abc123",
+  "strategy": "CANARY",
+  "status": "in_progress",
+  "current_version": "v2.0.0",
+  "new_version": "v2.1.0",
+  "traffic_split": {
+    "current": 90,
+    "new": 10
+  },
+  "created_at": "2026-03-27T14:00:00Z"
+}
+```
+
+### POST `/api/v1/deployments/{id}/promote` — Promote Canary
+
+Increment traffic to the new version by `promote_increment` percent:
+
+```bash
+curl -X POST http://localhost:8085/api/v1/deployments/deploy_xyz789/promote \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
+
+**Response:**
+
+```json
+{
+  "deployment_id": "deploy_xyz789",
+  "status": "in_progress",
+  "traffic_split": {
+    "current": 65,
+    "new": 35
+  },
+  "message": "Traffic shifted from 10% to 35%"
+}
+```
+
+Call promote again to move to 60%, then 85%, then 100% (full promotion).
+
+### POST `/api/v1/deployments/{id}/rollback` — Rollback
+
+Revert all traffic to the current (stable) version:
+
+```bash
+curl -X POST http://localhost:8085/api/v1/deployments/deploy_xyz789/rollback \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -d '{"reason": "Error rate exceeded threshold"}'
+```
+
+**Response:**
+
+```json
+{
+  "deployment_id": "deploy_xyz789",
+  "status": "rolled_back",
+  "traffic_split": {
+    "current": 100,
+    "new": 0
+  },
+  "rolled_back_at": "2026-03-27T14:12:00Z"
+}
+```
+
+### GET `/api/v1/deployments/{id}/status` — Check Status
+
+```bash
+curl http://localhost:8085/api/v1/deployments/deploy_xyz789/status \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
+
+**Response:**
+
+```json
+{
+  "deployment_id": "deploy_xyz789",
+  "status": "in_progress",
+  "strategy": "CANARY",
+  "current_version": "v2.0.0",
+  "new_version": "v2.1.0",
+  "traffic_split": {"current": 65, "new": 35},
+  "health": {
+    "current_error_rate": 0.002,
+    "new_error_rate": 0.003,
+    "threshold": 0.05
+  },
+  "elapsed_secs": 720,
+  "next_action": "promote (when ready)"
+}
+```
+
+## Canary Deployment Walkthrough
+
+A full canary rollout from 10% to 100%:
+
+```bash
+# 1. Configure canary deployment
+curl -X POST http://localhost:8085/api/v1/deployments \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -d '{
+    "agent_id": "agent_abc123",
+    "strategy": "CANARY",
+    "config": {"new_version": "v2.1.0", "initial_traffic_percent": 10}
+  }'
+# → deploy_xyz789 created, 10% traffic to v2.1.0
+
+# 2. Wait and monitor (check error rate, latency)
+curl http://localhost:8085/api/v1/deployments/deploy_xyz789/status
+
+# 3. Promote to 35%
+curl -X POST http://localhost:8085/api/v1/deployments/deploy_xyz789/promote
+# → traffic: 35% to v2.1.0
+
+# 4. Promote to 60%
+curl -X POST http://localhost:8085/api/v1/deployments/deploy_xyz789/promote
+# → traffic: 60% to v2.1.0
+
+# 5. Promote to 85%
+curl -X POST http://localhost:8085/api/v1/deployments/deploy_xyz789/promote
+
+# 6. Final promotion to 100%
+curl -X POST http://localhost:8085/api/v1/deployments/deploy_xyz789/promote
+# → status: "completed", 100% on v2.1.0
+```
+
+## Blue-Green Deployment
+
+```bash
+curl -X POST http://localhost:8085/api/v1/deployments \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -d '{
+    "agent_id": "agent_abc123",
+    "strategy": "BLUE_GREEN",
+    "config": {
+      "new_version": "v2.1.0",
+      "warm_up_secs": 30
+    }
+  }'
+```
+
+Blue-green deploys the new version to a parallel slot and warms it up for `warm_up_secs` before accepting traffic. Call `/promote` once to do the instant cutover.
+
+## Automatic Rollback
+
+Set `auto_rollback_on_error_rate` to automatically rollback if the new version's error rate exceeds a threshold:
+
+```json
+{
+  "config": {
+    "new_version": "v2.1.0",
+    "auto_rollback_on_error_rate": 0.05
+  }
+}
+```
+
+If the new version's error rate exceeds 5% during health checks, the deployment is automatically rolled back and the status is set to `"auto_rolled_back"`.
+
+## Required Permissions
+
+| Endpoint | Required permission |
+|----------|-------------------|
+| `POST /api/v1/deployments` | `agents:write` |
+| `POST /api/v1/deployments/{id}/promote` | `agents:admin` |
+| `POST /api/v1/deployments/{id}/rollback` | `agents:admin` |
+| `GET /api/v1/deployments/{id}/status` | `agents:read` |
+
+## Next Steps
+
+- [Pre-built Agents](./index) — agent management, templates, config versioning
+- [RBAC](../model/rbac) — permission configuration
