@@ -29,6 +29,9 @@ export default {
   oauth: 'OAuth Transport',
   environment: 'Environment',
   'deployment-guide': 'Deployment',
+  'production-resilience': 'Production Resilience',
+  'observability': 'Observability',
+  'error-taxonomy': 'Error Taxonomy',
   testing: 'Testing',
   examples: 'Examples',
   'api-reference': 'API Reference'

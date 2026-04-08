@@ -38,6 +38,57 @@
 - **Per-Agent Config** - Each agent has its own skills, tools, and options
 - See [Multi-Agent](./multi-agent.md) for details
 
+## Production Resilience
+
+### Circuit Breakers
+Every service client (Model, Session, Storage, Audit, MCP) is wrapped with a circuit breaker that prevents cascading failures when a service is degraded.
+
+```python
+from isa_agent_sdk.core.resilience import get_isa_model_circuit_breaker
+cb = get_isa_model_circuit_breaker()  # failure_threshold=8, recovery=15s
+```
+
+### Bulkhead Isolation
+Separate resource pools for reasoning (model calls, default 4) and tool execution (default 8) prevent slow tools from starving model reasoning. Configurable via `ISAAgentOptions.max_concurrent_reasoning` and `max_concurrent_tools`.
+
+### Error Classification
+`classify_error()` maps any exception to a structured `ErrorContext` with recovery action (retry, fallback, escalate, abort). See [Error Taxonomy](/agent-sdk/error-taxonomy) for the full mapping.
+
+### MCP Fallback
+When MCP is unavailable, `MCPFallbackService` serves cached tool schemas and baseline tools (read, write, bash) so agents continue in degraded mode.
+
+### Recovery Playbooks
+Automated recovery for top failure modes: model fallback (switch to cheaper model), MCP fallback (local tool cache), memory degradation (skip enrichment).
+
+### Graceful Degradation
+`DegradationManager` lets nodes skip optional operations (HIL approval, memory enrichment, summarization) when services are degraded, rather than failing the entire agent.
+
+## Observability
+
+### OpenTelemetry Tracing
+`trace_service_call()` wraps any service call with an OTel span. Enable via `ISA_TRACING_ENABLED=true`. Install with `pip install isa-agent-sdk[observability]`.
+
+### Production Monitoring
+Prometheus metrics for circuit breakers, bulkhead pools, tracing health, and MCP fallback. Includes alerting rules and SLO definitions (99.95% completion rate). Pre-flight validation via `scripts/preflight_check.py`.
+
+## Intent-Driven Tier Routing
+
+SenseNode classifies intent into 5 categories and recommends a model tier:
+
+| Intent | Tier | Examples |
+|--------|------|----------|
+| `direct_answer` | FAST | greetings, simple facts |
+| `clarification` | FAST | short questions |
+| `team_discovery` | FAST | "which team handles X?" |
+| `delegation` | FAST | "delegate to trade" |
+| `tool_use` | REASONING | complex multi-step tasks |
+
+Enable with `ISAAgentOptions(tier_routing_enabled=True)`. Uses existing `resolve_model_for_tier()` with subscription provider registry.
+
+## Lightweight Delegation
+
+`ISAAgentOptions(lightweight_context=True)` skips memory, file context, and semantic tool search for A2A delegated tasks, reducing context init from ~60s to ~2s.
+
 ## Advanced Features
 
 ### MCP Resource Management

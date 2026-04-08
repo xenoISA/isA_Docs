@@ -1,0 +1,107 @@
+# Observability
+
+The isA Agent SDK has a 3-layer observability architecture:
+
+| Layer | Tool | Scope |
+|-------|------|-------|
+| **Proxy** | Prometheus via `isa_common.metrics` | HTTP gateway metrics (latency, error rates, tokens) |
+| **Agent** | OpenTelemetry via `TracingManager` | Service call spans (model, tool, memory, session) |
+| **Training** | Agent Lightning | RL training data (rollouts, rewards) |
+
+All three layers are independent and compose additively.
+
+## OpenTelemetry Tracing
+
+### Setup
+
+```bash
+# Install OTel dependencies
+pip install "isa-agent-sdk[observability]"
+
+# Enable via environment
+export ISA_TRACING_ENABLED=true
+export ISA_TRACING_EXPORTER=otlp          # otlp, console, or none
+export ISA_TRACING_SERVICE_NAME=isa-agent-sdk
+export ISA_TRACING_SAMPLING_RATE=1.0       # 0.0-1.0
+```
+
+### Service Call Tracing
+
+Wrap any async service call with a span:
+
+```python
+from isa_agent_sdk.observability import trace_service_call
+
+async with trace_service_call("model", "call_model", model="claude-3") as span:
+    result = await model_client.call(...)
+    # Span auto-records: duration, status, error (if raised)
+```
+
+### Programmatic Configuration
+
+```python
+from isa_agent_sdk.observability import configure_tracing, TracingConfig
+
+configure_tracing(TracingConfig(
+    enabled=True,
+    service_name="my-agent",
+    sampling_rate=0.5,
+    exporter="otlp",
+))
+```
+
+### Tracing Metrics
+
+```python
+from isa_agent_sdk.observability import tracing_metrics
+
+m = tracing_metrics()
+# {"enabled": True, "spans_created": 142, "spans_dropped": 0}
+```
+
+## Metrics Reference
+
+### Circuit Breaker
+
+| Metric | Description |
+|--------|-------------|
+| `cb_state{service}` | 0=closed, 1=open, 2=half_open |
+| `cb_failure_count{service}` | Total failures |
+| `cb_success_count{service}` | Total successes |
+
+### Bulkhead
+
+| Metric | Description |
+|--------|-------------|
+| `bulkhead_active{pool}` | Currently occupied slots |
+| `bulkhead_queued{pool}` | Requests waiting |
+| `bulkhead_total_exhausted{pool}` | Timeout exhaustions |
+
+### MCP Fallback
+
+| Metric | Description |
+|--------|-------------|
+| `mcp_fallback_active` | 1 if fallback mode |
+| `mcp_fallback_activation_count` | Times fallback activated |
+| `mcp_fallback_cached_tools` | Cached tool schemas |
+
+## Alerting Rules
+
+### Critical (P0)
+- **Model CB open > 5m** — Check model API status and API keys
+- **2+ services with CB open** — Cascading failure, check network/infra
+- **Bulkhead exhaustion > 10/min** — Scale up or increase pool sizes
+
+### Warning (P1)
+- **Error rate > 5% over 5m** — Check logs for failing service
+- **MCP fallback active > 10m** — Check MCP server health
+- **Spans dropped > 100/min** — Check OTel collector
+
+## SLO Definitions
+
+| SLI | Target | Window |
+|-----|--------|--------|
+| Agent completion success rate | 99.95% | 30-day rolling |
+| Agent completion latency p99 | < 30s | 30-day rolling |
+| Tool execution success rate | 99.9% | 30-day rolling |
+| MCP availability | 99.9% | 30-day rolling |

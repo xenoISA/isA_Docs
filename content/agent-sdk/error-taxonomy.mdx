@@ -1,0 +1,76 @@
+# Error Taxonomy
+
+The `classify_error()` utility maps all SDK exceptions to one of four recovery actions.
+
+## Recovery Actions
+
+| Action | Meaning | Caller Behavior |
+|--------|---------|-----------------|
+| **RETRY** | Transient failure | Retry with exponential backoff up to `max_retries` |
+| **FALLBACK** | Service degraded | Switch to fallback model/tool/cache |
+| **ESCALATE** | Needs human attention | Surface to user or alert ops |
+| **ABORT** | Permanent failure | Stop execution, return error |
+
+## Classification Table
+
+### RETRY
+
+| Exception | max_retries | When |
+|-----------|-------------|------|
+| `ISATimeoutError` | 3 | API request exceeded timeout |
+| `ISAConnectionError` | 3 | Service unreachable |
+| `RateLimitError` | 5 | API rate limit hit |
+| `ToolExecutionError` | 2 | Tool returned transient error |
+| `asyncio.TimeoutError` | 3 | Python-level timeout |
+| `ConnectionError` | 3 | Built-in connection failure |
+| `OSError` | 3 | Network/IO error |
+
+### FALLBACK
+
+| Exception | Fallback Target | When |
+|-----------|----------------|------|
+| `CircuitBreakerError` | Alternative service/model | Circuit breaker is open |
+| `MCPConnectionError` | Local tool cache | MCP server down |
+| `ModelError` | Cheaper/local model | Model API error |
+
+### ESCALATE
+
+| Exception | Who | When |
+|-----------|-----|------|
+| `HILDeniedError` | User | Permission request denied |
+| `HILTimeoutError` | User | No response in time |
+| `ISAPermissionError` | Operator | Insufficient permissions |
+| Unknown exceptions | Operator | Unclassified errors |
+
+### ABORT
+
+| Exception | When |
+|-----------|------|
+| `SessionNotFoundError` | Session doesn't exist |
+| `SessionExpiredError` | Session TTL passed |
+| `MaxIterationsError` | Too many reasoning loops |
+| `SchemaError` | JSON schema validation failed |
+| `DAGValidationError` | Circular dependency or malformed DAG |
+| `ConfigurationError` | ISAAgentOptions misconfigured |
+| `ISAValidationError` | Generic input validation failure |
+
+## Usage
+
+```python
+from isa_agent_sdk.core.resilience import classify_error, RecoveryAction
+
+try:
+    result = await model_client.call_model(messages)
+except Exception as exc:
+    ctx = classify_error(exc, service_name="model", operation="call_model")
+    print(ctx.format_log_line())
+    # error_type=ModelError | service=model | operation=call_model | recovery=fallback
+```
+
+## Structured Logging
+
+`ErrorContext.format_log_line()` produces pipe-delimited structured logs:
+
+```
+error_type=ISATimeoutError | service=model | operation=call_model | recovery=retry | duration_ms=30001.2 | retry_attempt=1
+```

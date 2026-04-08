@@ -17,12 +17,14 @@ async for msg in query("Hello, world!"):
     print(msg.content, end="" if msg.is_text else "\n")
 ```
 
-## Latest Updates (2026-02-14)
+## Latest Updates (2026-04-08)
 
-- **Audit hardening completed** - all tracked security audit findings (issues `#13` to `#26`) were resolved in `isa_agent_sdk`.
-- **Swarm + DAG workflows expanded** - production-ready dynamic handoffs (`[HANDOFF:...]`) and dependency-ordered DAG execution are now documented and tested.
-- **A2A support stabilized** - Agent Card + JSON-RPC adapters are now part of the standard integration path.
-- **Test coverage increased** - SDK test suite is at **234 passing tests**, including dedicated audit regression coverage.
+- **Production resilience shipped** - Circuit breakers on all service clients, bulkhead isolation, error classification, MCP fallback, recovery playbooks, and graceful degradation.
+- **Observability upgraded** - OpenTelemetry service tracing, structured error logging, production monitoring guide with SLOs.
+- **Intent-driven tier routing** - SenseNode classifies intent (direct_answer, team_discovery, delegation, tool_use) and routes to FAST or REASONING model tier.
+- **BaseNode migration complete** - All 6 production nodes migrated to ISP-compliant base classes (ReasoningNode, ToolExecutionNode). Zero deprecation warnings.
+- **SDK client bugs fixed** - Stream exception propagation, content deduplication, event loop safety, A2A resubscribe.
+- **Test coverage** - 3,500+ tests including chaos testing framework.
 
 ## Core Concepts
 

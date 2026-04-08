@@ -1,0 +1,122 @@
+# Production Resilience
+
+The isA Agent SDK includes a comprehensive resilience layer that prevents cascading failures, enables graceful degradation, and automates recovery from common failure modes.
+
+## Circuit Breakers
+
+Every service client is wrapped with a circuit breaker. When a service exceeds its failure threshold, the breaker opens and requests are fast-failed until recovery.
+
+| Service | Factory | Threshold | Recovery |
+|---------|---------|-----------|----------|
+| Model API | `get_isa_model_circuit_breaker()` | 8 failures | 15s |
+| Session | `get_session_circuit_breaker()` | 5 failures | 60s |
+| Storage | `get_storage_circuit_breaker()` | 5 failures | 60s |
+| Audit | `get_audit_circuit_breaker()` | 5 failures | 60s |
+| MCP | `get_mcp_circuit_breaker()` | 10 failures | 10s |
+
+```python
+from isa_agent_sdk.core.resilience import CircuitBreaker, get_isa_model_circuit_breaker
+
+cb = get_isa_model_circuit_breaker()
+# States: CLOSED (normal) → OPEN (failing) → HALF_OPEN (testing) → CLOSED
+```
+
+## Bulkhead Isolation
+
+Separate asyncio semaphore pools for reasoning (model calls) and tool execution prevent resource starvation.
+
+```python
+from isa_agent_sdk import ISAAgentOptions
+
+options = ISAAgentOptions(
+    max_concurrent_reasoning=4,  # Model call pool
+    max_concurrent_tools=8,      # Tool execution pool
+    bulkhead_queue_timeout=30.0, # Wait timeout for a slot
+)
+```
+
+When a pool is exhausted, requests queue up to `bulkhead_queue_timeout` before raising `BulkheadExhaustedError`.
+
+## Error Classification
+
+`classify_error()` maps any exception to a structured `ErrorContext` with a recovery action:
+
+```python
+from isa_agent_sdk.core.resilience import classify_error, RecoveryAction
+
+try:
+    result = await model_client.call_model(messages)
+except Exception as exc:
+    ctx = classify_error(exc, service_name="model", operation="call_model")
+    
+    if ctx.recovery_action == RecoveryAction.RETRY:
+        # Retry with exponential backoff (up to ctx.max_retries)
+    elif ctx.recovery_action == RecoveryAction.FALLBACK:
+        # Switch to fallback model or cached tools
+    elif ctx.recovery_action == RecoveryAction.ESCALATE:
+        # Surface to user or ops
+    else:  # ABORT
+        raise
+```
+
+See [Error Taxonomy](/agent-sdk/error-taxonomy) for the full classification table.
+
+## MCP Fallback
+
+When the MCP server is unavailable, `MCPFallbackService` serves cached tool schemas and baseline tools (read_file, write_file, bash) so agents continue operating in degraded mode.
+
+- On successful MCP connection, tool schemas are cached to disk (`~/.isa/mcp_cache/`)
+- On failure, cached or baseline tools are served automatically
+- Auto-reconnect with fallback deactivation when MCP recovers
+
+## Recovery Playbooks
+
+`PlaybookRegistry` automates recovery for the top 3 failure modes:
+
+| Playbook | Trigger | Action |
+|----------|---------|--------|
+| `model_fallback` | Model CB opens | Switch to cheaper/local model |
+| `mcp_fallback` | MCP unavailable | Activate local tool cache |
+| `memory_degradation` | Memory service slow | Skip memory enrichment |
+
+```python
+from isa_agent_sdk.core.resilience import create_default_registry, classify_error
+
+registry = create_default_registry()
+ctx = classify_error(exc, "model", "call_model")
+result = await registry.execute(ctx)
+# result.outcome: SUCCESS, PARTIAL, FAILED, SKIPPED
+# result.fallback_value: {"action": "switch_model", "target": "fallback"}
+```
+
+## Graceful Degradation
+
+`DegradationManager` tracks degraded services and advises nodes on whether to skip optional operations:
+
+```python
+from isa_agent_sdk.core.resilience import get_degradation_manager
+
+dm = get_degradation_manager()
+dm.mark_degraded("memory", reason="latency > 3s")
+
+# Nodes check before optional operations
+if dm.should_degrade("sense_node", "memory"):
+    # Skip memory enrichment, use last-turn context only
+```
+
+| Node | Service | Degradation Behavior |
+|------|---------|---------------------|
+| GuardrailNode | HIL | Skip approval check, continue with warning |
+| SenseNode | Memory | Skip memory context, use last-turn only |
+| ReasonNode | Model | Reduce max_tokens if CB half-open |
+| SummarizationNode | Model | Skip summarization pass, preserve raw messages |
+
+## Pre-flight Validation
+
+Before deploying, run the pre-flight check to validate configuration:
+
+```bash
+python scripts/preflight_check.py
+```
+
+This validates circuit breakers, bulkhead pools, OTel tracing, MCP cache, session persistence, and API keys.

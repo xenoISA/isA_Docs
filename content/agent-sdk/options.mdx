@@ -419,6 +419,11 @@ runtime_config = options.to_runtime_config()
 | `mcp_servers` | Dict | {} | MCP server configs |
 | `pool_config` | PoolConfig | None | Pool configuration |
 | `metadata` | Dict | None | Additional metadata |
+| `max_concurrent_reasoning` | int | 4 | Bulkhead pool size for model calls |
+| `max_concurrent_tools` | int | 8 | Bulkhead pool size for tool execution |
+| `bulkhead_queue_timeout` | float | 30.0 | Timeout waiting for bulkhead slot (seconds) |
+| `tier_routing_enabled` | bool | False | Intent-driven model tier routing |
+| `lightweight_context` | bool | False | Skip heavy context init for A2A delegation |
 
 ## Next Steps
 

@@ -217,8 +217,33 @@ By emitting a heartbeat every 15 seconds, the SDK stays well within all common t
 adapter.stream_rpc_events(body, heartbeat_interval=5)
 ```
 
+## Delegation Result Status
+
+`DelegationResult.status` supports 4 values:
+
+| Status | Meaning |
+|--------|---------|
+| `success` | Team responded normally |
+| `degraded` | Team responded but quality is reduced (rate limited, partial content, fallback model) |
+| `error` | Team failed |
+| `timeout` | Team didn't respond in time |
+
+When `status="degraded"`, `DelegationResult.degradation_reason` explains why (e.g. `rate_limited`, `partial_content`, `fallback_model`).
+
+## Resubscribe
+
+`tasks/resubscribe` with an existing `taskId` returns the stored task state without creating new work:
+
+```python
+resp = await client.send_rpc("tasks/resubscribe", {"taskId": "task_abc123"})
+# Returns existing completed/working task — no duplicate execution
+```
+
+## Lightweight Delegation
+
+For simple delegated tasks, `ISAAgentOptions(lightweight_context=True)` skips memory, file context, and semantic tool search, reducing context initialization from ~60s to ~2s.
+
 ## Notes
 
 - For quick local functional testing, `A2A_AUTH_REQUIRED=false` can be used.
 - For real interoperability testing, enable auth and pass OAuth token from `auth_service /oauth/token`.
-- Current `ask()` aggregation may duplicate text in some responses; transport itself is working.
