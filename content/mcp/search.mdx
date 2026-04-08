@@ -9,6 +9,8 @@ ISA MCP provides two search strategies:
 1. **Semantic Search** - Vector similarity matching
 2. **Hierarchical Search** - Two-stage skill → tool routing
 
+Both strategies can degrade to lexical mode when the semantic dependency is unavailable. In that case the server remains searchable, `/health` reports `search.mode = lexical`, and hierarchical search metadata records the fallback reason.
+
 ## Semantic Search
 
 Find tools using natural language queries.
@@ -62,21 +64,24 @@ User Query: "schedule a meeting"
 └────────────────────────────────────────┘
 ```
 
-### Skill Categories
+### Representative Skill Categories
 
-```
-Skills (6 Categories)
-├── Productivity (calendar, task, note, time)
-├── Communication (email, messaging)
-├── Data (query, analysis, visualization)
-├── File (operations, documents, media)
-├── Integration (API, webhooks)
-└── System (config, monitoring, security)
-```
+The taxonomy is versioned and broader than the original six high-level buckets. Common examples include:
+
+- `date-time`
+- `vector-semantic`
+- `text-search`
+- `web-search`
+- `http-api`
+- `task-management`
+- `calendar-events`
+- `analytics-metrics`
+
+Use `GET /api/v1/search/skills?query=...` to inspect the discoverable skill taxonomy directly.
 
 ## Fallback Behavior
 
-When no skills match, the system falls back to direct search across all tools.
+When no skills match, the system falls back to direct search across all tools. If the semantic dependency is unavailable entirely, the platform falls back to lexical search and reports that in the response metadata.
 
 ## Search Metadata
 
@@ -85,10 +90,50 @@ When no skills match, the system falls back to direct search across all tools.
   "query": "schedule meeting",
   "tools": [...],
   "metadata": {
-    "strategy": "hierarchical",
-    "skills_matched": ["calendar_management"],
-    "fallback_used": false,
-    "search_time_ms": 45.2
+    "strategy_used": "hierarchical",
+    "skill_ids_used": ["calendar-events"],
+    "stage1_skill_count": 1,
+    "stage2_candidate_count": 12,
+    "final_count": 5,
+    "fallback_mode": null,
+    "fallback_reason": null
+  }
+}
+```
+
+Example degraded fragment:
+
+```json
+{
+  "metadata": {
+    "strategy_used": "hierarchical",
+    "fallback_mode": "lexical",
+    "fallback_reason": "ISA Model health check failed: ReadTimeout"
+  }
+}
+```
+
+## Health and Fallback Reporting
+
+Use `/health` to determine whether search is operating in semantic or lexical mode:
+
+```json
+{
+  "search": {
+    "status": "ok",
+    "mode": "semantic"
+  }
+}
+```
+
+or
+
+```json
+{
+  "search": {
+    "status": "degraded",
+    "mode": "lexical",
+    "reason": "ISA Model health check failed: ReadTimeout"
   }
 }
 ```

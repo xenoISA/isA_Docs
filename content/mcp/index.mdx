@@ -8,16 +8,18 @@ ISA MCP provides:
 
 - Unified tool/prompt/resource registry
 - Skill-based semantic discovery
+- Graceful semantic-to-lexical search fallback
 - Human-in-the-loop (HIL) workflows
 - External MCP server aggregation
+- Standalone enterprise MCP servers
 - Multi-tenant isolation and security controls
 
-## Latest Updates (2026-02-14)
+## Latest Updates (2026-04-08)
 
-- **Hybrid multi-tenant platform rollout** across tool, prompt, resource, skill, marketplace, and aggregator services.
-- **Security hardening** for auth bypass prevention, shell execution safeguards, path traversal protection, and registry fetch SSRF controls.
-- **Reliability improvements** for Qdrant retry handling, vector ID overflow protection, cache versioning, and atomic delete flows.
-- **Guidance refresh** with new security, multi-tenant, and reliability operational docs.
+- **Health semantics refresh** so `/health` now distinguishes healthy, degraded, and unready states.
+- **Search degradation support** so the platform falls back to lexical search if the semantic model dependency is unavailable.
+- **Enterprise MCP server docs** for the dedicated API gateway, database, filesystem, and message queue servers.
+- **Security and reliability docs refresh** covering response headers, rate limiting, and degraded-mode behavior.
 
 ## Platform Capabilities
 
@@ -27,7 +29,7 @@ ISA MCP provides:
 | Prompts | 50+ reusable prompts |
 | Resources | 9+ resource groups |
 | HIL methods | 4 interaction modes |
-| Skills | 6 discovery categories |
+| Skills | Versioned taxonomy with skill search |
 | Aggregator | External MCP server federation |
 
 ## Architecture
@@ -46,9 +48,9 @@ ISA MCP provides:
 
 ## Core Features
 
-### Skill-Based Semantic Search
+### Skill-Based Search
 
-Natural-language query routing through skill classification and ranked matches.
+Natural-language query routing through skill classification and ranked matches. Semantic search is the default path; if the model dependency is unavailable, MCP degrades to lexical search and reports that mode through `/health` and search metadata.
 
 ```python
 results = await search("schedule a meeting with John")
@@ -66,6 +68,21 @@ Supports:
 ### Aggregator Service
 
 Register, connect, monitor, and route to external MCP servers with namespace-aware tool routing.
+
+### Standalone Enterprise Servers
+
+The repo also ships smaller MCP servers for focused infrastructure domains:
+
+- `api_gateway_mcp`
+- `database_mcp`
+- `filesystem_mcp`
+- `message_queue_mcp`
+
+Each exposes the standard MCP surfaces:
+
+- `GET /health`
+- `GET /.well-known/mcp-server-card.json`
+- `POST /mcp`
 
 ### Marketplace
 
@@ -110,7 +127,7 @@ Enterprise-grade security hardening across the platform:
 
 - [Security](./security) - auth, authorization levels, SSRF/traversal/injection controls
 - [Multi-Tenant](./multi-tenant) - org scoping, global vs org-local resources
-- [Reliability](./reliability) - retry policy, overflow protection, cache/version patterns
+- [Reliability](./reliability) - health semantics, retries, degraded modes, and overflow protection
 
 ## API Endpoints
 
@@ -121,6 +138,9 @@ Base URL: `http://localhost:8081`
 | `/mcp` | POST | MCP JSON-RPC endpoint |
 | `/health` | GET | Server health check |
 | `/search` | POST | Semantic search |
+| `/api/v1/search` | POST | Hierarchical search with skill routing |
+| `/api/v1/search/tools` | GET | Tool-only search contract |
+| `/api/v1/search/skills` | GET | Skill taxonomy search contract |
 | `/progress/{id}/stream` | GET | SSE progress stream |
 | `/api/v1/skills/*` | - | Skill management |
 | `/api/v1/aggregator/*` | - | External server aggregation |
@@ -152,4 +172,3 @@ Base URL: `http://localhost:8081`
 - [Human-in-the-Loop](./hil)
 - [Progress Tracking](./progress)
 - [Server Aggregation](./aggregator)
-
