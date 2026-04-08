@@ -16,6 +16,8 @@ cd /path/to/isA_MCP
 python main.py
 ```
 
+If the Model Service is unavailable at startup, MCP still comes up and search operates in degraded lexical mode until semantic search is available again.
+
 ## Basic Client
 
 ```python
@@ -73,6 +75,7 @@ async def main():
     health = await client.get_health()
     print(f"Server: {health['status']}")
     print(f"Tools: {health['capabilities']['tools']}")
+    print(f"Search mode: {health['search']['mode']}")
 
 asyncio.run(main())
 ```
@@ -86,9 +89,29 @@ health = await client.get_health()
 # Output:
 # {
 #   "status": "healthy",
-#   "capabilities": {"tools": 88, "prompts": 50, "resources": 9}
+#   "capabilities": {"tools": 200, "prompts": 40, "resources": 20},
+#   "search": {"status": "ok", "mode": "semantic"}
 # }
 ```
+
+Degraded-but-serving example:
+
+```python
+# {
+#   "status": "degraded",
+#   "search": {
+#     "status": "degraded",
+#     "mode": "lexical",
+#     "reason": "ISA Model health check failed: ReadTimeout"
+#   }
+# }
+```
+
+Health status meanings:
+
+- `healthy`: critical dependencies are up and the server is ready
+- `degraded` with HTTP `200`: traffic is served, but some capability has degraded
+- `degraded` with HTTP `503`: a critical dependency or open circuit breaker has made the server unready
 
 ### Call Tool
 
@@ -146,4 +169,5 @@ if "error" in result:
 - [Search & Discovery](./search) - Semantic and hierarchical search
 - [Human-in-the-Loop](./hil) - Human interaction
 - [Progress Tracking](./progress) - Monitor long operations
+- [Reliability](./reliability) - Health semantics and degraded modes
 - [Server Aggregation](./aggregator) - External MCP servers

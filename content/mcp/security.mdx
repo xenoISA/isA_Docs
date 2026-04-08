@@ -31,7 +31,7 @@ Use API keys in headers:
 X-API-Key: <api_key>
 ```
 
-API key verification is integrated with the auth stack; query-param API key usage is disabled for security.
+API key verification is integrated with the auth stack. Requests that include API keys in query parameters such as `?api_key=...` are rejected with HTTP `400` to avoid leaking credentials via browser history, proxy logs, and referrer headers.
 
 ## Tool Security Levels
 
@@ -123,6 +123,34 @@ Scopes changed from `a2a.*` to `mcp:*` in v0.7. The auth middleware auto-normali
 
 Tools that use POST from browser contexts (via Server-Sent Events) are supported with Bearer token auth. The auth middleware handles CORS pre-flight and token validation for browser-originated requests.
 
+## Security Response Headers
+
+Authentication and authorization failures use standard headers:
+
+- `401` responses include `WWW-Authenticate`
+- `403` insufficient-scope responses include `WWW-Authenticate` with the required scope
+
+Rate-limited requests also include standard backoff headers when the limiter has enough metadata:
+
+- `Retry-After`
+- `X-RateLimit-Limit`
+- `X-RateLimit-Remaining`
+- `X-RateLimit-Reset`
+
+### Rate Limit Flow
+
+When a tool is throttled, the structured error metadata is propagated to the HTTP layer:
+
+```http
+HTTP/1.1 429 Too Many Requests
+Retry-After: 60
+X-RateLimit-Limit: 10
+X-RateLimit-Remaining: 0
+X-RateLimit-Reset: 1700000000
+```
+
+Clients should respect `Retry-After` instead of retrying immediately.
+
 ## Related
 
 - [Tools](./tools)
@@ -130,4 +158,3 @@ Tools that use POST from browser contexts (via Server-Sent Events) are supported
 - [Reliability](./reliability)
 - [OAuth 2.0 PKCE Guide](/user/oauth-pkce)
 - [Scope Migration Guide](/user/scope-migration)
-

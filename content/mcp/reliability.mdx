@@ -2,13 +2,70 @@
 
 Reliability patterns added and hardened in ISA MCP.
 
-## Key Improvements (2026-02-14)
+## Key Improvements (2026-04-08)
 
+- Health/readiness semantics with healthy vs degraded states
+- Graceful semantic-to-lexical search fallback
 - Vector ID overflow detection for Qdrant point IDs
 - Exponential-backoff retry for transient Qdrant failures
 - Cache key versioning for safe schema evolution
 - Atomic delete patterns to avoid count/delete race conditions
 - Transaction-wrapped migrations with rollback-ready structure
+
+## Health and Degraded Modes
+
+`GET /health` distinguishes ready, degraded, and unready states instead of collapsing all dependency issues into a single healthy response.
+
+| HTTP | `status` | Meaning |
+|------|----------|---------|
+| `200` | `healthy` | Critical dependencies are healthy and the server is ready |
+| `200` | `degraded` | Traffic is still served, but some capability has degraded |
+| `503` | `degraded` | The server is not ready because a critical dependency failed or a circuit breaker is open |
+| `503` | `initializing` / `draining` | Startup or shutdown transition state |
+
+The health payload includes a dedicated `search` block:
+
+```json
+{
+  "search": {
+    "status": "ok",
+    "mode": "semantic"
+  }
+}
+```
+
+When the model dependency is unavailable, search degrades instead of hard-failing:
+
+```json
+{
+  "search": {
+    "status": "degraded",
+    "mode": "lexical",
+    "reason": "ISA Model health check failed: ReadTimeout"
+  }
+}
+```
+
+Operationally:
+
+- treat `search.mode = semantic` as the normal steady state
+- treat `search.mode = lexical` as serviceable but degraded
+- treat `search.status = error` as unready and page on it
+
+## Standard Retry and Rate-Limit Headers
+
+Structured resilience errors are translated into standard HTTP headers so clients can back off automatically.
+
+HTTP `429` responses may include:
+
+- `Retry-After`
+- `X-RateLimit-Limit`
+- `X-RateLimit-Remaining`
+- `X-RateLimit-Reset`
+
+HTTP `502` responses raised from an open circuit breaker include:
+
+- `Retry-After`
 
 ## Vector Store Safety
 
@@ -217,4 +274,3 @@ On reconnect, health failures are reset to `0` and a `reconnect` event is record
 
 - [Security](./security)
 - [Multi-Tenant](./multi-tenant)
-
