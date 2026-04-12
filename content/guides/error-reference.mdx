@@ -1,0 +1,294 @@
+# Error Reference
+
+Complete reference for isA API error codes, causes, and resolution steps.
+
+## Error Response Format
+
+All isA API errors return a consistent JSON structure:
+
+```json
+{
+  "error": {
+    "code": "invalid_api_key",
+    "message": "The API key provided is invalid or has been revoked.",
+    "type": "authentication_error",
+    "param": null
+  }
+}
+```
+
+| Field | Type | Description |
+|---|---|---|
+| `code` | string | Machine-readable error code |
+| `message` | string | Human-readable description |
+| `type` | string | Error category |
+| `param` | string? | The parameter that caused the error (if applicable) |
+
+---
+
+## HTTP Status Codes
+
+### 400 Bad Request
+
+The request was malformed or missing required fields.
+
+```json
+{
+  "error": {
+    "code": "invalid_request",
+    "message": "The 'model' field is required.",
+    "type": "invalid_request_error",
+    "param": "model"
+  }
+}
+```
+
+**Common causes:**
+- Missing required fields (`model`, `messages`, `input_data`)
+- Invalid JSON in request body
+- Unsupported parameter values
+
+**Resolution:** Check the API reference for required fields. Validate JSON before sending.
+
+### 401 Unauthorized
+
+Authentication failed.
+
+```json
+{
+  "error": {
+    "code": "invalid_api_key",
+    "message": "The API key provided is invalid.",
+    "type": "authentication_error"
+  }
+}
+```
+
+**Common causes:**
+- Missing `Authorization: Bearer <token>` header
+- Expired JWT token
+- Revoked API key
+- API key from wrong organization
+
+**Resolution:**
+```python
+# Check your API key is set
+import os
+api_key = os.environ.get("ISA_API_KEY")
+if not api_key or not api_key.startswith("isa_"):
+    raise ValueError("ISA_API_KEY must be set and start with 'isa_'")
+```
+
+### 403 Forbidden
+
+You don't have permission to access this resource.
+
+```json
+{
+  "error": {
+    "code": "insufficient_permissions",
+    "message": "Your role does not have permission: models.deploy",
+    "type": "permission_error"
+  }
+}
+```
+
+**Common causes:**
+- RBAC role lacks required permission
+- API key restricted to specific endpoints
+- IP address not in allowlist
+- Accessing another organization's resources
+
+**Resolution:** Contact your org admin to update your role permissions.
+
+### 404 Not Found
+
+The requested resource doesn't exist.
+
+```json
+{
+  "error": {
+    "code": "resource_not_found",
+    "message": "Agent 'agent_abc123' not found.",
+    "type": "not_found_error"
+  }
+}
+```
+
+**Common causes:**
+- Incorrect resource ID
+- Resource was deleted
+- Wrong API version prefix
+
+### 409 Conflict
+
+The request conflicts with the current state.
+
+```json
+{
+  "error": {
+    "code": "conflict",
+    "message": "An agent with this name already exists.",
+    "type": "conflict_error"
+  }
+}
+```
+
+**Common causes:**
+- Duplicate resource creation
+- Concurrent modification
+- Deleting a role that still has members assigned
+
+### 422 Unprocessable Entity
+
+The request was valid JSON but contained semantic errors.
+
+```json
+{
+  "error": {
+    "code": "validation_error",
+    "message": "temperature must be between 0 and 2",
+    "type": "validation_error",
+    "param": "temperature"
+  }
+}
+```
+
+**Common causes:**
+- Parameter out of valid range
+- Invalid enum value
+- Schema validation failure for structured outputs
+
+### 429 Rate Limited
+
+You've exceeded your rate limit.
+
+```json
+{
+  "error": {
+    "code": "rate_limit_exceeded",
+    "message": "Rate limit exceeded. Retry after 2 seconds.",
+    "type": "rate_limit_error"
+  }
+}
+```
+
+**Headers returned:**
+```
+X-RateLimit-Limit: 500
+X-RateLimit-Remaining: 0
+X-RateLimit-Reset: 1714003200
+Retry-After: 2
+```
+
+**Handling rate limits (Python):**
+```python
+import time
+import requests
+
+def call_with_retry(url, payload, max_retries=3):
+    for attempt in range(max_retries):
+        response = requests.post(url, json=payload, headers=headers)
+        if response.status_code == 429:
+            retry_after = int(response.headers.get("Retry-After", 2 ** attempt))
+            time.sleep(retry_after)
+            continue
+        return response
+    raise Exception("Max retries exceeded")
+```
+
+**Handling rate limits (TypeScript):**
+```typescript
+async function callWithRetry(url: string, payload: unknown, maxRetries = 3) {
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    const res = await fetch(url, { method: 'POST', body: JSON.stringify(payload), headers });
+    if (res.status === 429) {
+      const retryAfter = parseInt(res.headers.get('Retry-After') || String(2 ** attempt));
+      await new Promise(r => setTimeout(r, retryAfter * 1000));
+      continue;
+    }
+    return res;
+  }
+  throw new Error('Max retries exceeded');
+}
+```
+
+### 500 Internal Server Error
+
+An unexpected error occurred on the server.
+
+```json
+{
+  "error": {
+    "code": "internal_error",
+    "message": "An unexpected error occurred. Please try again.",
+    "type": "server_error"
+  }
+}
+```
+
+**Resolution:** Retry with exponential backoff. If persistent, check the [Health Dashboard](/dashboard/health) and report via support.
+
+### 503 Service Unavailable
+
+The service is temporarily unavailable.
+
+```json
+{
+  "error": {
+    "code": "service_unavailable",
+    "message": "The model service is temporarily unavailable.",
+    "type": "server_error"
+  }
+}
+```
+
+**Resolution:** Wait and retry. Check the health dashboard. This typically resolves within minutes during deployments.
+
+---
+
+## Service-Specific Errors
+
+### Agent Errors
+
+| Code | Meaning |
+|---|---|
+| `agent_not_found` | Agent config doesn't exist |
+| `agent_execution_failed` | Agent run encountered an error |
+| `agent_timeout` | Agent exceeded max execution time |
+| `tool_execution_failed` | An MCP tool call failed during agent execution |
+
+### Model Errors
+
+| Code | Meaning |
+|---|---|
+| `model_not_available` | Requested model is not deployed or unavailable |
+| `context_length_exceeded` | Input exceeds the model's context window |
+| `content_filter` | Response blocked by content moderation |
+| `invalid_model` | Model ID not recognized |
+
+### MCP Errors
+
+| Code | Meaning |
+|---|---|
+| `server_disconnected` | MCP server is not responding |
+| `tool_not_found` | Requested tool doesn't exist |
+| `tool_validation_error` | Tool input parameters are invalid |
+
+### Payment Errors
+
+| Code | Meaning |
+|---|---|
+| `insufficient_credits` | Account balance too low |
+| `payment_required` | Subscription expired or payment failed |
+| `plan_limit_exceeded` | Exceeded plan's request/token limit |
+
+---
+
+## Best Practices
+
+1. **Always check status codes** — Don't assume success
+2. **Implement retry logic** — Use exponential backoff for 429 and 5xx
+3. **Log error responses** — Include the full error body for debugging
+4. **Handle gracefully** — Show user-friendly messages, not raw errors
+5. **Monitor rate limits** — Track `X-RateLimit-Remaining` headers proactively

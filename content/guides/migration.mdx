@@ -1,0 +1,223 @@
+# Migration Guides
+
+Step-by-step guides for migrating between isA API versions.
+
+## API Versioning Strategy
+
+isA uses path-based versioning (`/api/v1/`, `/api/v2/`). When breaking changes are introduced:
+- The old version continues to work for a deprecation period (minimum 6 months)
+- Migration guides are published here
+- The changelog notes the deprecation timeline
+
+---
+
+## Chat API: Legacy Format to Structured Format
+
+### What Changed
+
+The inference endpoint now supports `tools`, `response_format`, and `stream` as first-class parameters instead of embedding them in `input_data`.
+
+### Before (Legacy)
+
+```python
+import requests
+
+response = requests.post("https://api.isa.dev/api/v1/models/invoke", json={
+    "input_data": [
+        {"role": "system", "content": "You are a helpful assistant."},
+        {"role": "user", "content": "Hello"},
+    ],
+    "task": "chat",
+    "service_type": "text",
+    "model": "gpt-4o",
+    "provider": "openai",
+    "stream": False,
+    "temperature": 0.7,
+    "max_tokens": 4096,
+})
+```
+
+### After (New Format)
+
+```python
+import requests
+
+response = requests.post("https://api.isa.dev/api/v1/models/chat", json={
+    "model": "gpt-4o",
+    "messages": [
+        {"role": "system", "content": "You are a helpful assistant."},
+        {"role": "user", "content": "Hello"},
+    ],
+    "temperature": 0.7,
+    "max_tokens": 4096,
+    "tools": [
+        {"type": "web_search", "web_search": {"max_results": 5}}
+    ],
+    "response_format": {
+        "type": "json_schema",
+        "json_schema": {"name": "response", "schema": {"type": "object"}}
+    },
+})
+```
+
+### Migration Steps
+
+1. Change endpoint from `/api/v1/models/invoke` to `/api/v1/models/chat`
+2. Rename `input_data` to `messages`
+3. Remove `task`, `service_type`, `provider` (auto-detected from model ID)
+4. Add `tools` array for built-in tools (web_search, file_search)
+5. Use `response_format` for structured outputs instead of `responseFormat: "json"`
+
+### Compatibility
+
+The legacy `/api/v1/models/invoke` endpoint continues to work unchanged. No action required if you don't need the new features.
+
+---
+
+## Agent Config: v1 to v2
+
+### What Changed
+
+Agent configurations gained `execution_profiles` for A2A deployment and `routing_hints` for dynamic routing.
+
+### Before
+
+```json
+{
+  "name": "support-bot",
+  "model": "gpt-4o",
+  "system_prompt": "You are a support agent.",
+  "mode": "REACTIVE",
+  "tools": ["search_kb", "create_ticket"]
+}
+```
+
+### After
+
+```json
+{
+  "name": "support-bot",
+  "model": "gpt-4o",
+  "system_prompt": "You are a support agent.",
+  "mode": "REACTIVE",
+  "tools": ["search_kb", "create_ticket"],
+  "execution_profiles": {
+    "default": {
+      "environment": "cloud_pool",
+      "max_turns": 10,
+      "timeout_seconds": 300
+    }
+  },
+  "routing_hints": {
+    "domains": ["support", "billing"],
+    "priority": 1
+  }
+}
+```
+
+### Migration Steps
+
+1. Add `execution_profiles.default` with your preferred environment
+2. Optionally add `routing_hints` for multi-agent routing
+3. Existing configs without these fields continue to work with defaults
+
+---
+
+## Authentication: Token Format Update
+
+### What Changed
+
+API keys now use the `isa_` prefix for identification. Existing keys without the prefix continue to work.
+
+### Before
+
+```bash
+curl -H "Authorization: Bearer sk_abc123..." https://api.isa.dev/api/v1/models/chat
+```
+
+### After
+
+```bash
+curl -H "Authorization: Bearer isa_abc123..." https://api.isa.dev/api/v1/models/chat
+```
+
+### Migration Steps
+
+1. Generate new API keys in the Console (they auto-get the `isa_` prefix)
+2. Update your environment variables with the new key
+3. Old keys continue to work — no hard cutoff
+
+---
+
+## MCP: v1 to v2
+
+### What Changed
+
+The MCP service added the Aggregator REST API alongside the existing JSON-RPC transport.
+
+### Before (JSON-RPC only)
+
+```python
+import json
+import requests
+
+response = requests.post("https://api.isa.dev/api/v1/mcp/", json={
+    "jsonrpc": "2.0",
+    "method": "tools/call",
+    "params": {"name": "web_search", "arguments": {"query": "isA platform"}},
+    "id": 1,
+})
+```
+
+### After (REST API available)
+
+```python
+# Option 1: REST (new, simpler)
+response = requests.get("https://api.isa.dev/api/v1/mcp/tools")
+tools = response.json()
+
+# Option 2: JSON-RPC (still works)
+response = requests.post("https://api.isa.dev/api/v1/mcp/", json={
+    "jsonrpc": "2.0",
+    "method": "tools/list",
+    "id": 1,
+})
+```
+
+### Migration Steps
+
+1. For listing tools/prompts/resources: switch to REST endpoints for simpler code
+2. For tool execution: both JSON-RPC and REST work, choose based on preference
+3. No breaking changes — JSON-RPC transport is fully preserved
+
+---
+
+## SDK Updates
+
+### Python SDK
+
+```bash
+# Check current version
+pip show isa-agent-sdk
+
+# Upgrade to latest
+pip install --upgrade isa-agent-sdk
+```
+
+### TypeScript SDK
+
+```bash
+# Check current version
+npm list @isa/core
+
+# Upgrade to latest
+npm install @isa/core@latest
+```
+
+### Breaking Changes by Version
+
+| SDK Version | Change | Migration |
+|---|---|---|
+| 2.0.0 | `query()` renamed to `chat()` | Find/replace `query` → `chat` |
+| 2.0.0 | `ISAAgentOptions` → `ChatOptions` | Update type imports |
+| 1.5.0 | `stream` default changed to `true` | Add `stream: false` if you need sync |

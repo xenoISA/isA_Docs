@@ -31,6 +31,7 @@ export default {
     type: 'separator',
     title: 'Learn'
   },
+  guides: 'Guides',
   cookbook: 'Cookbook',
   quickstarts: 'Quickstarts',
   '------': {

@@ -1,0 +1,128 @@
+# cURL / REST API Quickstart
+
+Make API calls directly with cURL — no SDK required.
+
+## Authentication
+
+All requests require a Bearer token:
+
+```bash
+export ISA_API_KEY="isa_your_api_key_here"
+```
+
+## Chat Completion
+
+```bash
+curl -X POST https://api.isa.dev/api/v1/models/invoke \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $ISA_API_KEY" \
+  -d '{
+    "model": "gpt-4o",
+    "input_data": [
+      {"role": "system", "content": "You are a helpful assistant."},
+      {"role": "user", "content": "What is the capital of France?"}
+    ],
+    "task": "chat",
+    "service_type": "text",
+    "temperature": 0.7,
+    "max_tokens": 1024
+  }'
+```
+
+## Streaming
+
+Add `"stream": true` and use `--no-buffer`:
+
+```bash
+curl -X POST https://api.isa.dev/api/v1/models/invoke \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $ISA_API_KEY" \
+  --no-buffer \
+  -d '{
+    "model": "gpt-4o",
+    "input_data": [
+      {"role": "user", "content": "Write a short poem about coding"}
+    ],
+    "task": "chat",
+    "service_type": "text",
+    "stream": true
+  }'
+```
+
+## List Models
+
+```bash
+curl https://api.isa.dev/api/v1/models/ \
+  -H "Authorization: Bearer $ISA_API_KEY"
+```
+
+## Create an Agent
+
+```bash
+curl -X POST https://api.isa.dev/api/v1/agents/configs \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $ISA_API_KEY" \
+  -d '{
+    "name": "my-assistant",
+    "model": "gpt-4o",
+    "system_prompt": "You are a helpful assistant.",
+    "mode": "REACTIVE"
+  }'
+```
+
+## List Agents
+
+```bash
+curl https://api.isa.dev/api/v1/agents/configs \
+  -H "Authorization: Bearer $ISA_API_KEY"
+```
+
+## Chat with an Agent
+
+```bash
+curl -X POST https://api.isa.dev/api/v1/agents/chat \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $ISA_API_KEY" \
+  --no-buffer \
+  -d '{
+    "agent_config_id": "YOUR_AGENT_ID",
+    "message": "Hello, can you help me?",
+    "session_id": "session_001"
+  }'
+```
+
+## Manage API Keys
+
+```bash
+# List keys
+curl https://api.isa.dev/api/v1/auth/api-keys \
+  -H "Authorization: Bearer $ISA_API_KEY" \
+  -H "X-Organization-Id: YOUR_ORG_ID"
+
+# Create a key
+curl -X POST https://api.isa.dev/api/v1/auth/api-keys \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $ISA_API_KEY" \
+  -H "X-Organization-Id: YOUR_ORG_ID" \
+  -d '{"name": "production-key"}'
+```
+
+## Common Endpoints
+
+| Method | Endpoint | Description |
+|---|---|---|
+| POST | `/api/v1/models/invoke` | Chat completion |
+| GET | `/api/v1/models/` | List available models |
+| POST | `/api/v1/agents/configs` | Create agent |
+| GET | `/api/v1/agents/configs` | List agents |
+| POST | `/api/v1/agents/chat` | Chat with agent (SSE) |
+| GET | `/api/v1/auth/api-keys` | List API keys |
+| POST | `/api/v1/auth/api-keys` | Create API key |
+| GET | `/api/v1/mcp/tools` | List MCP tools |
+| GET | `/api/v1/auth/health` | Health check |
+
+## Next Steps
+
+- [Python SDK](/quickstarts/sdk-python) — Easier with the Python SDK
+- [TypeScript SDK](/quickstarts/sdk-typescript) — Easier with the TS SDK
+- [API Error Reference](/guides/error-reference) — Handle errors properly
