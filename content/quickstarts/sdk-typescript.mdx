@@ -1,0 +1,150 @@
+# TypeScript SDK Quickstart
+
+Get from zero to your first API call in under 5 minutes.
+
+## Installation
+
+```bash
+npm install @isa/core
+```
+
+## Authentication
+
+Set your API key:
+
+```bash
+export ISA_API_KEY="isa_your_api_key_here"
+```
+
+Or pass it directly:
+
+```typescript
+import { ModelService } from '@isa/core';
+
+const client = new ModelService('https://api.isa.dev', {
+  apiKey: process.env.ISA_API_KEY,
+});
+```
+
+## First Inference Call
+
+```typescript
+import { ModelService } from '@isa/core';
+
+const model = new ModelService('https://api.isa.dev');
+
+const response = await model.chat({
+  model: 'gpt-4o',
+  messages: [
+    { role: 'user', content: 'What is the capital of France?' },
+  ],
+});
+
+console.log(response.choices[0].message.content);
+// "The capital of France is Paris."
+```
+
+## Streaming Responses
+
+```typescript
+const stream = model.chatStream({
+  model: 'gpt-4o',
+  messages: [
+    { role: 'system', content: 'You are a helpful assistant.' },
+    { role: 'user', content: 'Explain quantum computing' },
+  ],
+  temperature: 0.7,
+});
+
+for await (const chunk of stream) {
+  const text = chunk.choices[0]?.delta?.content || '';
+  process.stdout.write(text);
+}
+console.log();
+```
+
+## Create an Agent
+
+```typescript
+import { AgentService } from '@isa/core';
+
+const agents = new AgentService('https://api.isa.dev');
+
+const agent = await agents.createConfig({
+  name: 'research-assistant',
+  model: 'gpt-4o',
+  system_prompt: 'You are a research assistant.',
+  mode: 'REACTIVE',
+  tools: ['web_search'],
+});
+
+console.log(`Created agent: ${agent.id}`);
+```
+
+## Manage API Keys
+
+```typescript
+import { AuthService } from '@isa/core';
+
+const auth = new AuthService('https://api.isa.dev');
+
+// List keys
+const { api_keys } = await auth.listApiKeys(orgId);
+console.log(`You have ${api_keys.length} API keys`);
+
+// Create a new key
+const newKey = await auth.createApiKey(orgId, 'my-app-key');
+console.log(`New key: ${newKey.key}`); // Only shown once!
+```
+
+## Full Working Example
+
+```typescript
+#!/usr/bin/env npx tsx
+/**
+ * isA Platform — TypeScript SDK quickstart
+ * Run: npx tsx quickstart.ts
+ */
+
+import { ModelService } from '@isa/core';
+
+const BASE_URL = 'https://api.isa.dev';
+
+async function main() {
+  if (!process.env.ISA_API_KEY) {
+    console.error('Set ISA_API_KEY environment variable first');
+    process.exit(1);
+  }
+
+  const model = new ModelService(BASE_URL);
+
+  // Simple chat
+  console.log('=== Simple Chat ===');
+  const response = await model.chat({
+    model: 'gpt-4o',
+    messages: [{ role: 'user', content: 'What is 2 + 2?' }],
+  });
+  console.log(`Answer: ${response.choices[0].message.content}\n`);
+
+  // Streaming
+  console.log('=== Streaming ===');
+  const stream = model.chatStream({
+    model: 'gpt-4o',
+    messages: [{ role: 'user', content: 'Write a haiku about TypeScript' }],
+    temperature: 1.0,
+  });
+
+  for await (const chunk of stream) {
+    process.stdout.write(chunk.choices[0]?.delta?.content || '');
+  }
+  console.log('\n\nDone!');
+}
+
+main().catch(console.error);
+```
+
+## Next Steps
+
+- [App SDK Reference](/app-sdk) — Full TypeScript SDK docs
+- [Cookbook](/cookbook) — Practical recipes
+- [Prompt Engineering](/guides/prompt-engineering) — Write better prompts

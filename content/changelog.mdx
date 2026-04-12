@@ -2,6 +2,46 @@
 
 All notable changes to the isA platform.
 
+## v0.8.0 — April 11, 2026
+
+### isA_Console — Developer Platform Parity
+
+Closing feature gaps identified in a competitive analysis against OpenAI and Anthropic developer platforms. 33 stories across 6 epics.
+
+- **[New]** Prompt Management: `/dashboard/prompts` — create, version, and test reusable prompt templates with `{{variable}}` syntax
+- **[New]** AI Prompt Generator: generate and improve prompts from natural language descriptions
+- **[New]** Evaluation Suite: `/dashboard/evaluations` — test cases, grading (exact match, LLM-as-judge, regex), side-by-side model comparison
+- **[New]** Batch Processing: `/dashboard/batch` — submit JSONL jobs at 50% reduced cost, progress tracking, download results
+- **[New]** Request Logs: `/dashboard/logs` — inspect individual API requests with filters, expandable payloads, live tail
+- **[New]** Audit Log: `/dashboard/audit-log` — immutable org event trail (user, key, agent, auth events)
+- **[New]** Conversations: `/dashboard/conversations` — manage hosted conversation state
+- **[New]** Projects: `/dashboard/projects` — project-scoped isolation for keys, usage, and budgets
+- **[New]** Members & RBAC: `/dashboard/members` — role management (Owner, Admin, Developer, Billing, Viewer), 30 granular permissions
+- **[New]** Webhook Management: Settings > Webhooks tab — CRUD, event subscriptions, delivery logs, test endpoint
+- **[New]** Vector Stores: `/dashboard/vector-stores` — managed RAG with file upload, semantic search
+- **[New]** Service Health Dashboard: `/dashboard/health` — real-time service status cards, auto-refresh
+- **[New]** Pricing Page: `/pricing` — public page with tier comparison, per-model pricing table, cost calculator
+- **[New]** Structured Outputs: playground toggle with JSON Schema editor and validation feedback
+- **[New]** Sidebar Navigation: added Conversations, Prompts, Evaluations, Logs, Vector Stores, Batch, Health, Projects, Members, Audit Log
+
+### isA_Console — Admin Services
+
+- **[New]** `PromptAdminService` — CRUD + versioning for prompt templates
+- **[New]** `EvalAdminService` — evaluation suites, test cases, runs, results, comparison
+- **[New]** `BatchAdminService` — batch job lifecycle with multipart upload
+- **[New]** `ObservabilityAdminService` — request logs and audit log queries
+- **[New]** `WebhookAdminService` — webhook CRUD, test, delivery logs
+- **[New]** `usePermissions` hook — client-side RBAC with 30 granular permissions
+- **[New]** `useServiceHealth` hook — SWR-based health polling across 6 services
+
+### isA_Docs — Documentation Gaps
+
+- **[New]** Prompt Engineering Guide: comprehensive guide covering zero-shot, few-shot, CoT, tool use, agent prompts, model-specific tips
+- **[New]** Error Reference: complete HTTP error code reference with causes, resolution, retry examples
+- **[New]** Migration Guides: Chat API, Agent Config, Auth, MCP version migration paths
+- **[New]** SDK Quickstarts: Python, TypeScript, cURL — copy-paste ready, under 5 minutes
+- **[Updated]** Changelog: structured format with dated entries, categorized by area
+
 ## v0.7.0 — March 27, 2026
 
 ### isA_Agent_SDK — Long-Running Agent Hardening (Epic #510)

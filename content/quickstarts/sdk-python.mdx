@@ -1,0 +1,148 @@
+# Python SDK Quickstart
+
+Get from zero to your first API call in under 5 minutes.
+
+## Installation
+
+```bash
+pip install isa-agent-sdk
+```
+
+## Authentication
+
+Set your API key as an environment variable:
+
+```bash
+export ISA_API_KEY="isa_your_api_key_here"
+```
+
+Get your API key from the [Console](https://console.isa.dev/dashboard/api-keys).
+
+## First Inference Call
+
+```python
+import asyncio
+from isa_agent_sdk import ask
+
+async def main():
+    response = await ask("What is the capital of France?")
+    print(response)  # "The capital of France is Paris."
+
+asyncio.run(main())
+```
+
+## Chat with History
+
+```python
+from isa_agent_sdk import query, ISAAgentOptions
+
+async def chat():
+    options = ISAAgentOptions(
+        model="gpt-4o",
+        system_prompt="You are a helpful coding assistant.",
+        temperature=0.7,
+    )
+
+    response = await query("Write a Python function to reverse a string", options)
+    print(response)
+
+asyncio.run(chat())
+```
+
+## Streaming Responses
+
+```python
+from isa_agent_sdk import query, ISAAgentOptions
+
+async def stream():
+    options = ISAAgentOptions(
+        model="gpt-4o",
+        stream=True,
+    )
+
+    async for chunk in query("Explain quantum computing", options):
+        print(chunk, end="", flush=True)
+    print()
+
+asyncio.run(stream())
+```
+
+## Create an Agent
+
+```python
+from isa_agent_sdk import Agent
+
+agent = Agent(
+    name="research-assistant",
+    model="gpt-4o",
+    system_prompt="You are a research assistant. Search the web for current information.",
+    tools=["web_search"],
+)
+
+response = await agent.run("What are the latest developments in AI?")
+print(response)
+```
+
+## Tool Use
+
+```python
+from isa_agent_sdk import query, ISAAgentOptions
+
+options = ISAAgentOptions(
+    model="gpt-4o",
+    tools=[{"type": "web_search", "web_search": {"max_results": 5}}],
+)
+
+response = await query("What happened in tech news today?", options)
+print(response)
+```
+
+## Full Working Script
+
+```python
+#!/usr/bin/env python3
+"""isA Platform — Python SDK quickstart."""
+
+import asyncio
+import os
+from isa_agent_sdk import ask, query, ISAAgentOptions
+
+async def main():
+    # Verify API key
+    if not os.environ.get("ISA_API_KEY"):
+        print("Set ISA_API_KEY environment variable first")
+        return
+
+    # Simple query
+    print("=== Simple Query ===")
+    answer = await ask("What is 2 + 2?")
+    print(f"Answer: {answer}\n")
+
+    # Chat with options
+    print("=== Chat with Options ===")
+    response = await query(
+        "Write a haiku about programming",
+        ISAAgentOptions(model="gpt-4o", temperature=1.0),
+    )
+    print(f"Haiku:\n{response}\n")
+
+    # Streaming
+    print("=== Streaming ===")
+    async for chunk in query(
+        "Count from 1 to 5",
+        ISAAgentOptions(model="gpt-4o", stream=True),
+    ):
+        print(chunk, end="", flush=True)
+    print("\n")
+
+    print("Done!")
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+## Next Steps
+
+- [Agent SDK Reference](/agent-sdk/api-reference) — Full API documentation
+- [Cookbook](/cookbook) — Practical recipes and examples
+- [Prompt Engineering Guide](/guides/prompt-engineering) — Write better prompts
