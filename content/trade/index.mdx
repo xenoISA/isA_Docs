@@ -113,9 +113,8 @@ The Risk Agent enforces hard limits that **cannot be overridden**:
 
 isA Trade enforces multiple layers of safety controls that protect the portfolio from catastrophic losses. These controls are **hardcoded and non-overridable** — no agent, operator, or configuration change can bypass them during live operation.
 
-<Callout type="error">
-**Safety-critical system.** The risk management rules described below are enforced at the code level. Disabling or weakening them requires source code changes and should never be done in a production environment.
-</Callout>
+> [!CAUTION]
+> **Safety-critical system.** The risk management rules described below are enforced at the code level. Disabling or weakening them requires source code changes and should never be done in a production environment.
 
 ### Live Trading Approval Gate
 
@@ -128,9 +127,8 @@ Before any real money is at risk, the system requires an explicit approval gate.
 3. If `LIVE_TRADING_GATE` is not set to exactly `approved` (case-insensitive), the system **silently falls back to paper trading** using a simulated `PaperBroker`.
 4. Even when the gate is approved, a live broker (Alpaca, CCXT, Moomoo, or Polymarket) must also be configured with valid API keys — otherwise the system still falls back to paper mode.
 
-<Callout type="warn">
-**Double-lock design.** Both `TRADING_MODE=live` AND `LIVE_TRADING_GATE=approved` must be set for real orders to execute. If either is missing or incorrect, the system uses the paper broker with no real money at risk.
-</Callout>
+> [!WARNING]
+> **Double-lock design.** Both `TRADING_MODE=live` AND `LIVE_TRADING_GATE=approved` must be set for real orders to execute. If either is missing or incorrect, the system uses the paper broker with no real money at risk.
 
 ```bash
 # Paper trading (default — no gate required)
@@ -174,9 +172,8 @@ When a trade is vetoed, the `ValidationResult` includes:
 
 Circuit breakers are automatic safety triggers managed by the **Kill Switch** module. When a circuit breaker trips, trading halts immediately without human intervention.
 
-<Callout type="error">
-**Circuit breakers cannot be disabled.** They are initialized at startup with the execution engine and run continuously. When triggered, they send critical alerts via the notification system and record the event in Prometheus metrics.
-</Callout>
+> [!CAUTION]
+> **Circuit breakers cannot be disabled.** They are initialized at startup with the execution engine and run continuously. When triggered, they send critical alerts via the notification system and record the event in Prometheus metrics.
 
 **Circuit breaker thresholds:**
 

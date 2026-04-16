@@ -18,9 +18,11 @@ export default async function Page(props: PageProps) {
   const result = await importPage(params.mdxPath)
   const { default: MDXContent, toc, metadata, sourceCode } = result
   const Wrapper = useMDXComponents().wrapper
+  const normalizedToc = Array.isArray(toc) ? toc : []
+  const normalizedMetadata = metadata ?? {}
 
   return (
-    <Wrapper toc={toc} metadata={metadata} sourceCode={sourceCode}>
+    <Wrapper toc={normalizedToc} metadata={normalizedMetadata} sourceCode={sourceCode}>
       <MDXContent {...props} params={params} />
     </Wrapper>
   )

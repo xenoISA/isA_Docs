@@ -1,0 +1,20 @@
+{
+    "keep": {
+        "days": true,
+        "amount": 14
+    },
+    "auditLog": "/Users/xenodennis/Documents/Fun/isA/isA_Docs/logs/.1192f734bd5f1c8d638a8bd9aa7bfa5ac1eeefd4-audit.json",
+    "files": [
+        {
+            "date": 1774173313064,
+            "name": "/Users/xenodennis/Documents/Fun/isA/isA_Docs/logs/mcp-puppeteer-2026-03-22.log",
+            "hash": "6461ba2b977b541999edd494a980a57df0f2083f05e35ce9b38b408dc4835300"
+        },
+        {
+            "date": 1774592741593,
+            "name": "/Users/xenodennis/Documents/Fun/isA/isA_Docs/logs/mcp-puppeteer-2026-03-27.log",
+            "hash": "5323b73052e63b183b0bfadffae241e3775db754ef23192b2f8c2fdde3722d8e"
+        }
+    ],
+    "hashType": "sha256"
+}

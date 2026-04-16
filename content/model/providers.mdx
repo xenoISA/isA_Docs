@@ -8,7 +8,7 @@ isA Model supports multiple providers, each with different strengths:
 
 | Provider | Best For | Models |
 |----------|----------|--------|
-| `openai` | General purpose, latest models | gpt-4.1-nano, gpt-4o, o4-mini |
+| `openai` | General purpose, latest models | gpt-4o-mini, gpt-4o, o4-mini |
 | `anthropic` | Long context, safety | claude-3-opus, claude-3-sonnet |
 | `openrouter` | Multi-model access, reasoning | 200+ models including deepseek-r1, o1/o3 |
 | `anthropic-sub` | Flat-rate Claude access | claude-sonnet-4-20250514 via subscription proxy |
@@ -58,7 +58,7 @@ openai:
   api_key: ${OPENAI_API_KEY}
   api_base_url: https://api.openai.com/v1
   organization: ${OPENAI_ORG_ID}  # Optional
-  default_model: gpt-4.1-nano
+  default_model: gpt-4o-mini
   temperature: 0.7
   max_tokens: 4096
   rate_limit_rpm: 500
@@ -75,7 +75,7 @@ from isa_model.inference.ai_factory import AIFactory
 factory = AIFactory()
 
 # Standard chat
-llm = factory.get_service("text", "openai", "gpt-4.1-nano")
+llm = factory.get_service("text", "openai", "gpt-4o-mini")
 
 # Reasoning model
 llm_reasoning = factory.get_service("text", "openai", "o4-mini")
@@ -118,7 +118,7 @@ async for token in llm.astream("Hello!"):
 
 ```python
 # Access 200+ models from a single API
-llm = factory.get_service("text", "openrouter", "anthropic/claude-3.5-sonnet")
+llm = factory.get_service("text", "openrouter", "anthropic/claude-sonnet-4-6")
 
 # Reasoning models detected automatically (deepseek-r1, o1/o3, :thinking suffix)
 llm_reasoning = factory.get_service("text", "openrouter", "deepseek/deepseek-r1")

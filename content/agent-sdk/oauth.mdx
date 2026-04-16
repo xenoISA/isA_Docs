@@ -268,7 +268,7 @@ model, provider = resolve_model_for_tier(
     ModelTier.FAST,
     active_provider="codex-sub",
 )
-# → ("gpt-4.1-nano", "codex-sub")
+# → ("gpt-4o-mini", "codex-sub")
 ```
 
 ### Tier Defaults
@@ -276,7 +276,7 @@ model, provider = resolve_model_for_tier(
 | Tier | `anthropic-sub` | `codex-sub` |
 |------|----------------|-------------|
 | REASONING | `claude-opus-4-6` | `gpt-5.4` |
-| FAST | `claude-3-haiku-20240307` | `gpt-4.1-nano` |
+| FAST | `claude-haiku-4-5` | `gpt-4o-mini` |
 | EMBEDDING | `text-embedding-3-small` (via openai) | `text-embedding-3-small` (via openai) |
 
 Override tiers via environment variables:

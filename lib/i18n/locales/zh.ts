@@ -1,0 +1,52 @@
+export const docsZh: Record<string, string> = {
+  'search.placeholder': '搜索...',
+  'search.shortcut': '⌘K',
+  'search.full_placeholder': '搜索文档...',
+  'search.unavailable': '搜索暂不可用',
+  'search.no_results': '未找到结果',
+  'search.ai_search': 'AI 搜索',
+  'search.close': 'ESC 关闭',
+  'search.type_to_search': '输入以搜索文档...',
+
+  'feedback.title': '此页面对您有帮助吗？',
+  'feedback.yes': '是',
+  'feedback.no': '否',
+  'feedback.thanks': '感谢您的反馈！',
+  'feedback.sorry': '很抱歉。我们如何改进此页面？',
+  'feedback.input_placeholder': '哪些内容缺失或不清楚？',
+  'feedback.submit': '提交反馈',
+  'feedback.cancel': '取消',
+
+  'error.title': '出了一些问题',
+  'error.description': '此组件渲染失败。',
+  'error.retry': '重试',
+  'error.not_found': '页面未找到',
+  'error.not_found_desc': '您访问的页面不存在或已被移动。',
+  'error.back_to_docs': '返回文档',
+
+  'footer.edit_page': '在 GitHub 上编辑此页面',
+  'footer.copyright': '© {{year}} isA 平台。开源项目。',
+
+  'theme.light': '切换到浅色主题',
+  'theme.dark': '切换到深色主题',
+  'theme.light_label': '浅色模式',
+  'theme.dark_label': '深色模式',
+
+  'status.operational': '所有系统正常运行',
+  'status.degraded': '性能降级',
+  'status.outage': '服务中断',
+  'status.maintenance': '维护中',
+  'status.uptime': '运行时间：',
+  'status.response': '响应时间：',
+
+  'common.loading': '加载中...',
+  'common.send': '发送请求',
+  'common.sending': '发送中...',
+  'common.response': '响应',
+  'common.show': '显示',
+  'common.hide': '隐藏',
+
+  'lang.en': 'English',
+  'lang.zh': '中文',
+  'lang.ru': 'Русский',
+};

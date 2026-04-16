@@ -8,7 +8,7 @@ The `ISAAgentOptions` class controls all aspects of agent behavior.
 from isa_agent_sdk import query, ISAAgentOptions
 
 options = ISAAgentOptions(
-    model="gpt-4.1-nano",
+    model="gpt-4o-mini",
     allowed_tools=["web_search", "read_file"],
     max_iterations=30
 )
@@ -24,12 +24,12 @@ async for msg in query("Your prompt", options=options):
 ```python
 options = ISAAgentOptions(
     # LLM model to use
-    model="gpt-4.1-nano",  # Default model
+    model="gpt-4o-mini",  # Default model
 )
 ```
 
 **Available Models:**
-- `gpt-4.1-nano` - Fast, cost-effective (default)
+- `gpt-4o-mini` - Fast, cost-effective (default)
 - `gpt-4o` - High capability
 - `deepseek-reasoner` - Reasoning model (chain-of-thought)
 - `llama-3.3-70b` - Open source alternative
@@ -355,7 +355,7 @@ options = ISAAgentOptions(
 
 ```yaml
 # agent_config.yaml
-model: gpt-4.1-nano
+model: gpt-4o-mini
 allowed_tools:
   - web_search
   - read_file
@@ -394,7 +394,7 @@ runtime_config = options.to_runtime_config()
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `model` | str | "gpt-4.1-nano" | LLM model |
+| `model` | str | "gpt-4o-mini" | LLM model |
 | `system_prompt` | str \| SystemPromptConfig | None | Custom system prompt (preset/append/replace) |
 | `allowed_tools` | List[str] | None | Tool allowlist |
 | `permission_mode` | PermissionMode | DEFAULT | Permission handling |

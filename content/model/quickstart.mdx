@@ -29,7 +29,7 @@ async def main():
         # Simple text generation
         response = await model.invoke(
             input_data="What is the capital of France?",
-            model="gpt-4.1-nano",
+            model="gpt-4o-mini",
             provider="openai"
         )
         print(response)
@@ -51,7 +51,7 @@ messages = [
 async with AsyncISAModel() as model:
     response = await model.invoke(
         input_data=messages,
-        model="gpt-4.1-nano",
+        model="gpt-4o-mini",
         provider="openai",
         service_type="text",
         task="chat"
@@ -67,7 +67,7 @@ from isa_model import AsyncISAModel
 async with AsyncISAModel() as model:
     async for chunk in model.stream(
         input_data="Write a short poem about coding",
-        model="gpt-4.1-nano",
+        model="gpt-4o-mini",
         provider="openai",
         stream=True
     ):
@@ -95,7 +95,7 @@ curl -X POST http://localhost:8082/api/v1/invoke \
   -H "Content-Type: application/json" \
   -d '{
     "input_data": [{"role": "user", "content": "Hello!"}],
-    "model": "gpt-4.1-nano",
+    "model": "gpt-4o-mini",
     "provider": "openai",
     "service_type": "text",
     "task": "chat"
@@ -106,7 +106,7 @@ curl -X POST http://localhost:8082/api/v1/invoke \
   -H "Content-Type: application/json" \
   -d '{
     "input_data": [{"role": "user", "content": "Write a story"}],
-    "model": "gpt-4.1-nano",
+    "model": "gpt-4o-mini",
     "provider": "openai",
     "service_type": "text",
     "stream": true
@@ -127,7 +127,7 @@ factory = AIFactory()
 llm = factory.get_service(
     service_type="text",
     provider="openai",
-    model="gpt-4.1-nano"
+    model="gpt-4o-mini"
 )
 
 # Simple invoke
@@ -154,7 +154,7 @@ async for token in llm.astream("Explain quantum computing"):
 
 | Provider | Models | Best For |
 |----------|--------|----------|
-| `openai` | gpt-4.1-nano, gpt-4o, o4-mini | General purpose |
+| `openai` | gpt-4o-mini, gpt-4o, o4-mini | General purpose |
 | `anthropic` | claude-3-opus, claude-3-sonnet | Long context |
 | `yyds` | gpt-4o-mini (proxy) | Cost optimization |
 | `cerebras` | llama-3.3-70b | Speed |
@@ -166,7 +166,7 @@ async for token in llm.astream("Explain quantum computing"):
 # OpenAI
 response = await model.invoke(
     input_data="Hello",
-    model="gpt-4.1-nano",
+    model="gpt-4o-mini",
     provider="openai"
 )
 
@@ -190,7 +190,7 @@ response = await model.invoke(
 ```python
 response = await model.invoke(
     input_data="Write a story",
-    model="gpt-4.1-nano",
+    model="gpt-4o-mini",
     provider="openai",
 
     # Generation parameters
@@ -219,7 +219,7 @@ async with AsyncISAModel() as model:
     try:
         response = await model.invoke(
             input_data="Hello",
-            model="gpt-4.1-nano",
+            model="gpt-4o-mini",
             provider="openai"
         )
     except ValueError as e:
