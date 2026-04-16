@@ -1,0 +1,60 @@
+# Fine-Tuning
+
+Train custom models using LoRA and full fine-tuning workflows.
+
+## Supported Algorithms
+
+| Algorithm | Description | Use Case |
+|-----------|------------|----------|
+| **APO** | Alignment Prompt Optimization | Improve instruction following |
+| **GRPO** | Group Relative Policy Optimization | RLHF-style alignment |
+| **Closed-Loop** | Iterative refinement with evaluation | Production quality tuning |
+| **Custom** | User-defined training pipeline | Advanced workflows |
+
+## Starting a Training Job
+
+```python
+from isa_sdk import ModelService
+
+model_svc = ModelService("http://localhost:8082")
+model_svc.set_auth_token(token)
+
+job = model_svc.start_training({
+    "algorithm_name": "apo",
+    "model_id": "llama-3-8b",
+    "dataset_id": "ds-001",
+    "hyperparameters": {
+        "learning_rate": 2e-5,
+        "epochs": 3,
+        "batch_size": 8,
+        "lora_rank": 16,
+    }
+})
+print(f"Training job started: {job['id']}")
+```
+
+## LoRA Configuration
+
+LoRA (Low-Rank Adaptation) reduces training cost by updating only a small subset of model parameters:
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `lora_rank` | 16 | Rank of low-rank matrices |
+| `lora_alpha` | 32 | Scaling factor |
+| `lora_dropout` | 0.05 | Dropout rate |
+| `target_modules` | auto | Modules to apply LoRA |
+
+## Monitoring Jobs
+
+```python
+# Check job status
+status = model_svc.get_training_job(job_id)
+print(f"Status: {status['status']}, Progress: {status['progress']}%")
+
+# List all jobs
+jobs = model_svc.list_training_jobs()
+```
+
+## Checkpoints
+
+Training creates checkpoints at configurable intervals. Use the Console training page to view checkpoints and select the best one for deployment.

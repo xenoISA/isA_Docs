@@ -1,0 +1,45 @@
+# Model Management
+
+Browse, deploy, train, evaluate, and monitor AI models.
+
+## Model Catalog
+
+`/dashboard/models` — browse available models with provider, context window, and pricing. Filter by provider or capability.
+
+## Deployments
+
+`/dashboard/models/deployments` — manage active model deployments:
+- Deploy new models with GPU type and region config
+- Monitor deployment status (running, deploying, failed)
+- Metric cards: total deployments, running, failed, estimated cost
+- Restart or delete deployments
+
+## Training
+
+`/dashboard/models/training` — manage training jobs:
+- Start training with algorithm selection (APO, GRPO, closed-loop, custom)
+- Configure hyperparameters, datasets, and training budget
+- Monitor job status and progress
+- Export training data in multiple formats
+
+## Evaluation
+
+`/dashboard/models/evaluation` — evaluate model performance:
+- Create evaluation suites with test cases
+- Run evaluations with configurable metrics
+- View results with pass/fail breakdowns
+- Compare evaluation runs over time
+
+## Prediction
+
+`/dashboard/models/prediction` — test model predictions:
+- Submit prediction requests with custom inputs
+- View response quality and latency
+- Train-on-predict for active learning workflows
+
+## Analytics
+
+`/dashboard/models/analytics` — model performance dashboards:
+- Request volume, latency percentiles, error rates
+- Cost tracking per model
+- Usage trends over time

@@ -1,0 +1,57 @@
+# Datasets
+
+Manage training and evaluation datasets with format validation.
+
+## Supported Formats
+
+| Format | Extension | Use Case |
+|--------|-----------|----------|
+| **OpenAI JSONL** | `.jsonl` | Chat fine-tuning (messages array) |
+| **HuggingFace** | `.json` | Instruction tuning (instruction/output pairs) |
+| **Raw JSON** | `.json` | Custom formats |
+
+## Creating Datasets
+
+### Via Console
+
+1. Go to `/dashboard/datasets`
+2. Click "Create Dataset"
+3. Enter name, description, and format
+4. Upload file or paste data
+
+### Via API
+
+```python
+# Upload a dataset
+dataset = model_svc.create_dataset({
+    "name": "customer-support-v2",
+    "description": "Support conversation examples",
+    "format": "openai_jsonl"
+})
+
+# Upload data file
+model_svc.upload_dataset_file(dataset["id"], open("data.jsonl", "rb"))
+```
+
+## Format Validation
+
+Before export, datasets are validated against the target format schema:
+
+**OpenAI JSONL** requires:
+```json
+{"messages": [{"role": "system", "content": "..."}, {"role": "user", "content": "..."}, {"role": "assistant", "content": "..."}]}
+```
+
+**HuggingFace** requires:
+```json
+{"instruction": "...", "output": "..."}
+```
+
+## Exporting
+
+Export datasets in any supported format via Console or API:
+```python
+data = model_svc.export_dataset(dataset_id, format="openai_jsonl")
+```
+
+The Console shows a preview of the first 3 rows in the selected format before exporting.

@@ -1,0 +1,33 @@
+# Playground
+
+Interactive testing environment for AI models and agents.
+
+## Chat Interface
+
+`/dashboard/playground` — test models with a conversational UI:
+- **Model selector** — choose from all available models (GPT-4o, Claude Sonnet, Gemini, etc.)
+- **System prompt** — configure agent behavior
+- **Chat panel** — send messages, view streaming responses
+- **Configuration sidebar** — temperature, max tokens, top-p, structured output schema
+
+## Features
+
+### Streaming Responses
+Responses stream in real-time using the model service's chat streaming API. Token-by-token display with typing indicator.
+
+### Structured Outputs
+Enable JSON schema validation for structured responses:
+- Define output schema in the config panel
+- Model responses are validated against the schema
+- Invalid responses show validation errors
+
+### Model Comparison
+Use the [Feature Matrix](/console/feature-matrix) to compare model capabilities before selecting in the playground.
+
+## MCP Playground
+
+`/dashboard/mcp/playground` — test MCP tools directly:
+- Select any registered MCP tool
+- Fill input parameters from the tool schema
+- Execute and inspect JSON-RPC request/response
+- View raw protocol messages

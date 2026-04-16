@@ -1,0 +1,83 @@
+# Observability
+
+Monitoring, health checks, and resilience patterns for User Services.
+
+## Prometheus Metrics
+
+All user services expose a `/metrics` endpoint for Prometheus scraping:
+
+```
+# HELP http_requests_total Total HTTP requests
+# TYPE http_requests_total counter
+http_requests_total{method="GET",endpoint="/api/v1/auth/verify-token",status="200"} 15432
+
+# HELP http_request_duration_seconds Request latency
+# TYPE http_request_duration_seconds histogram
+http_request_duration_seconds_bucket{le="0.1"} 14000
+```
+
+### Key Metrics
+
+| Metric | Type | Description |
+|--------|------|-------------|
+| `http_requests_total` | counter | Total requests by method, endpoint, status |
+| `http_request_duration_seconds` | histogram | Request latency distribution |
+| `active_sessions` | gauge | Currently active user sessions |
+| `auth_failures_total` | counter | Authentication failures |
+| `db_connections_active` | gauge | Active database connections |
+
+## Health Checks
+
+Each service exposes `/health` with structured response:
+
+```json
+{
+  "status": "ok",
+  "service": "auth_service",
+  "version": "0.7.0",
+  "uptime_seconds": 86400,
+  "checks": {
+    "database": "ok",
+    "redis": "ok",
+    "downstream": "ok"
+  }
+}
+```
+
+## Circuit Breakers
+
+Services use circuit breakers for downstream dependencies:
+
+```python
+from isa_common.resilience import CircuitBreaker
+
+breaker = CircuitBreaker(
+    failure_threshold=5,
+    recovery_timeout=30,
+    half_open_max_calls=3
+)
+
+@breaker
+async def call_billing_service():
+    return await http_client.get(f"{BILLING_URL}/api/v1/billing/status")
+```
+
+States: **closed** (normal) → **open** (failing, fast-fail) → **half-open** (testing recovery).
+
+## Graceful Shutdown
+
+Services handle SIGTERM for zero-downtime deployments:
+
+1. Stop accepting new requests
+2. Complete in-flight requests (30s timeout)
+3. Close database connections
+4. Flush metrics and logs
+5. Exit cleanly
+
+```python
+# Configured via isa_common lifecycle hooks
+from isa_common.lifecycle import register_shutdown_handler
+
+register_shutdown_handler(close_db_pool)
+register_shutdown_handler(flush_metrics)
+```

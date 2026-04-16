@@ -1,0 +1,60 @@
+# Settings & Account
+
+Manage API keys, organization members, projects, billing, and preferences.
+
+## API Keys
+
+`/dashboard/api-keys` — generate and manage API credentials:
+- Create keys with name and scope
+- View key prefix (masked after creation)
+- Revoke keys instantly
+- Copy key to clipboard
+
+## Members
+
+`/dashboard/members` — organization member management:
+- Invite members by email
+- Assign roles (admin, developer, viewer)
+- Remove members with confirmation
+
+## Projects
+
+`/dashboard/projects` — organize work into projects:
+- Create projects with name and description
+- **Project detail** (`/dashboard/projects/[id]`) — view resources, members, and settings per project
+
+## Settings
+
+`/dashboard/settings` — account preferences:
+- Profile: name, email
+- Theme: light/dark/system
+- Language: English, Chinese, Russian
+- Session management
+
+## Billing & Usage
+
+### Usage Dashboard
+`/dashboard/usage` — monitor consumption:
+- Daily usage chart (requests, tokens, cost)
+- Breakdown by model and agent
+- Export usage data
+
+### Subscription
+`/dashboard/subscription` — plan management:
+- Current plan details (Free, Pro, Enterprise)
+- Credit remaining and limits
+- Upgrade/downgrade options
+
+### Pricing Reference
+`/pricing` — public pricing page with:
+- Three-tier pricing (Free, Pro $29/mo, Enterprise $199/mo)
+- Per-model token pricing table
+- Interactive cost calculator
+
+## Webhooks
+
+`/dashboard/webhooks` — event notification management:
+- Create webhooks with URL and event type selectors
+- Test webhooks with sample payloads inline
+- View delivery history and status
+- Edit URL, events, and active status

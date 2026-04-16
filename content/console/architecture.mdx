@@ -1,0 +1,58 @@
+# Console Architecture
+
+## Tech Stack
+
+isA Console is built with **Next.js 16** (App Router) and **React 19**, using TypeScript in strict mode. It integrates four `@isa/core` SDK packages for service communication.
+
+| Layer | Technology |
+|-------|-----------|
+| Framework | Next.js 16 (App Router, Webpack) |
+| UI | React 19, Tailwind CSS 4, Lucide Icons |
+| Data | SWR 2.4 (caching, revalidation) |
+| Charts | Recharts 3.7 |
+| SDK | @isa/core, @isa/hooks, @isa/ui-web, @isa/theme |
+| Auth | JWT middleware, HttpOnly cookies |
+| i18n | Custom I18nProvider (en, zh, ru) |
+
+## Service Proxy Architecture
+
+Console proxies all backend API calls through Next.js rewrites in `next.config.ts`, avoiding browser CORS issues:
+
+```
+Browser → /api/v1/agents/* → Next.js Rewrite → agent_service:8080
+Browser → /api/v1/auth/*   → Next.js Rewrite → auth_service:8201
+Browser → /api/v1/models/* → Next.js Rewrite → model_service:8082
+```
+
+Nine backend services are proxied: Auth (8201), Session (8203), Organization (8212), Model (8082), MCP (8081), Agent (8080), Billing (8216), Payment (8207), and Vibe (8240).
+
+## Authentication Flow
+
+1. User submits credentials on `/login`
+2. Console calls `auth_service` POST `/api/v1/auth/login`
+3. On success, JWT is stored as an HttpOnly cookie via `/api/auth/set-token`
+4. Next.js middleware (`middleware.ts`) validates JWT structure and expiry on every `/dashboard/*` request
+5. Client-side `AuthProvider` restores session from localStorage, verifies token, loads organizations
+
+## Admin Services
+
+Each Console feature has a dedicated admin service class that wraps the SDK:
+
+- `AgentAdminService` — agent CRUD, versioning, templates, multi-agent specs
+- `MCPAdminService` — servers, tools, skills, resources, search
+- `ModelAdminService` — catalog, training, evaluation, deployments
+- `PromptAdminService` — prompt CRUD, versioning
+- `EvalAdminService` — evaluation suites, test cases, runs
+- `WorkflowAdminService` — workflow CRUD, execution, validation
+- `WebhookAdminService` — webhook CRUD, testing, deliveries
+- `BatchAdminService` — batch job management
+- `ObservabilityAdminService` — request logs, traces
+
+## Observability
+
+Console ships telemetry to the isA observability stack:
+
+- **Logs** → Loki via `/api/telemetry/loki`
+- **Traces** → Tempo via OTLP HTTP (opt-in browser tracing)
+- **Web Vitals** → Loki (CLS, FID, LCP, TTFB)
+- **Resource attributes** aligned with `isa_common` for cross-service correlation

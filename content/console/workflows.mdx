@@ -1,0 +1,38 @@
+# Workflow Management
+
+Create, execute, and monitor multi-step workflows.
+
+## Workflow List
+
+`/dashboard/workflows` — view all workflows with name, status, last execution time, and step count.
+
+## Creating Workflows
+
+`/dashboard/workflows/new` — build workflows with:
+- Name and description
+- Step definitions with agent assignments
+- Execution mode: sequential or parallel
+- Validation before save (checks for cycles, missing agents)
+
+## Workflow Detail
+
+`/dashboard/workflows/[name]` — view and edit workflow configuration:
+- Step graph visualization
+- Agent assignments per step
+- Configuration JSON editor
+- Delete with confirmation
+
+## Execution Monitoring
+
+`/dashboard/workflows/[name]/executions` — list all executions:
+- Status: pending, running, completed, failed
+- Start time, duration, step progress
+- Click to view execution detail
+
+### Execution Detail
+
+`/dashboard/workflows/[name]/executions/[id]` — detailed execution view:
+- Step-by-step progress timeline
+- Input/output per step
+- Error details for failed steps
+- Logs and traces

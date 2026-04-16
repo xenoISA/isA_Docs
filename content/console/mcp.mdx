@@ -1,0 +1,52 @@
+# MCP Platform
+
+Manage Model Context Protocol servers, tools, skills, and resources from the Console.
+
+## Overview Dashboard
+
+`/dashboard/mcp` — platform overview with:
+- Stats: total tools, prompts, resources, connected servers
+- Server status cards with health indicators
+- Quick actions: add server, search tools, manage skills
+
+## Servers
+
+`/dashboard/mcp/servers` — register and manage MCP servers:
+- Add servers by URL with auto-discovery
+- Connect/disconnect servers
+- View server health and capabilities
+- Refresh tool discovery
+
+## Tools
+
+`/dashboard/mcp/tools` — browse all discovered MCP tools:
+- Search by name or description
+- View tool schemas (input/output)
+- Filter by server or category
+
+## Skills
+
+`/dashboard/mcp/skills` — organize tools into skill categories:
+- View skill hierarchy (vibe, external, system)
+- Install/uninstall skills
+- Classify tools into skills
+
+## Search
+
+`/dashboard/mcp/search` — semantic search across all MCP tools:
+- Hierarchical search results
+- Filter by domain or capability
+
+## Marketplace
+
+`/dashboard/marketplace` — browse and install MCP tools/servers:
+- Package cards with descriptions and ratings
+- **SSE install progress modal** — real-time progress bar, log stream, retry on failure
+- Installed badge for active packages
+
+## Playground
+
+`/dashboard/mcp/playground` — test MCP tools interactively:
+- Select a tool, fill input schema
+- Execute and view results
+- JSON-RPC request/response inspection

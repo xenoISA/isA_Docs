@@ -1,0 +1,46 @@
+# Monitoring & Observability
+
+Track platform health, request traces, logs, and audit events.
+
+## Health Dashboard
+
+`/dashboard/health` — service health overview:
+- Status cards for each backend service (auth, agent, model, MCP, etc.)
+- Response time metrics
+- Error rate indicators
+
+## Traces
+
+`/dashboard/traces` — distributed trace explorer:
+- List all request traces with timing and status
+- Filter by service, status code, or time range
+- **Trace detail** (`/dashboard/traces/[id]`) — waterfall view of spans across services
+- **Trace replay** (`/dashboard/traces/[id]/replay`) — step-through replay of request flow
+
+## Logs
+
+`/dashboard/logs` — centralized log viewer:
+- Filter by service, level (info, warn, error), and time range
+- Search log content
+- Cursor-based pagination for large result sets
+
+## Analytics
+
+`/dashboard/analytics` — platform-wide analytics:
+- Request volume over time
+- Error rates by service
+- Latency percentiles (p50, p95, p99)
+
+## Monitoring
+
+`/dashboard/monitoring` — infrastructure monitoring:
+- Service uptime
+- Resource utilization
+- Alert status
+
+## Audit Log
+
+`/dashboard/audit-log` — security and compliance audit trail:
+- User actions: login, logout, API key creation, config changes
+- Filterable by user, action type, and time range
+- Exportable for compliance reporting

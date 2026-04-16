@@ -1,0 +1,48 @@
+# Feature Matrix
+
+Interactive model comparison across all supported providers.
+
+## Model Comparison Table
+
+`/dashboard/feature-matrix` — compare capabilities of 7 models:
+
+| Model | Provider | Context | Vision | Functions | Structured Output |
+|-------|----------|---------|--------|-----------|-------------------|
+| GPT-4o | OpenAI | 128K | Yes | Yes | Yes |
+| GPT-4o Mini | OpenAI | 128K | Yes | Yes | Yes |
+| Claude Sonnet 4.6 | Anthropic | 1M | Yes | Yes | Yes |
+| Claude Haiku 4.5 | Anthropic | 200K | No | Yes | Yes |
+| Gemini 2.0 Flash | Google | 1M | Yes | Yes | Yes |
+| DeepSeek R1 | DeepSeek | 64K | No | No | Yes |
+| Llama 3.3 70B | Meta (local) | 128K | No | Yes | No |
+
+## Capability Filters
+
+Filter models by specific capability using the dropdown:
+- Vision support
+- Function calling
+- Structured output
+- Batch processing
+- Fine-tuning support
+
+## Provider Documentation Links
+
+Each provider name links to official documentation:
+- **OpenAI** → platform.openai.com/docs/models
+- **Anthropic** → docs.anthropic.com
+- **Google** → ai.google.dev
+- **DeepSeek** → platform.deepseek.com/api-docs
+- **Meta** → llama.meta.com
+
+## isA Platform Exclusives
+
+The "isA Platform" column highlights features unique to isA:
+- **MCP Tool Marketplace** — browse and install tools from the ecosystem
+- **Multi-Agent Workflows** — DAG-based orchestration of agent teams
+- **Agent Version History** — track and diff config changes across versions
+- **Real-time Monitoring** — Grafana-integrated observability
+- **Evaluation Suite** — automated model quality testing
+
+## Playground Integration
+
+Click any model row to open the [Playground](/console/playground) with that model preselected for immediate testing.
