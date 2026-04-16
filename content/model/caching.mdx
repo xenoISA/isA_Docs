@@ -87,11 +87,11 @@ Caching is automatic when using the `/invoke` endpoint:
 ```bash
 # First request - calls LLM
 curl -X POST http://localhost:8082/api/v1/invoke \
-  -d '{"input_data": "What is Python?", "model": "gpt-4.1-nano", ...}'
+  -d '{"input_data": "What is Python?", "model": "gpt-4o-mini", ...}'
 
 # Second identical request - cache hit
 curl -X POST http://localhost:8082/api/v1/invoke \
-  -d '{"input_data": "What is Python?", "model": "gpt-4.1-nano", ...}'
+  -d '{"input_data": "What is Python?", "model": "gpt-4o-mini", ...}'
 ```
 
 ### Manual Cache Control
@@ -104,7 +104,7 @@ cache = get_llm_cache()
 # Check cache
 cached = await cache.get(
     messages=[{"role": "user", "content": "What is Python?"}],
-    model="gpt-4.1-nano",
+    model="gpt-4o-mini",
     provider="openai"
 )
 
@@ -116,7 +116,7 @@ else:
     response = await llm.ainvoke("What is Python?")
     await cache.set(
         messages=[{"role": "user", "content": "What is Python?"}],
-        model="gpt-4.1-nano",
+        model="gpt-4o-mini",
         provider="openai",
         response=response
     )
@@ -164,7 +164,7 @@ print(f"Tokens saved: {stats['total_saved_tokens']:,}")
 ### Invalidate Specific Model
 
 ```bash
-curl -X POST http://localhost:8082/api/v1/cache/invalidate/openai/gpt-4.1-nano
+curl -X POST http://localhost:8082/api/v1/cache/invalidate/openai/gpt-4o-mini
 ```
 
 ### Clear All Cache
@@ -181,11 +181,11 @@ cache = get_llm_cache()
 # Clear specific key
 await cache.invalidate(
     messages=[{"role": "user", "content": "What is Python?"}],
-    model="gpt-4.1-nano"
+    model="gpt-4o-mini"
 )
 
 # Clear by model
-await cache.clear_model("gpt-4.1-nano")
+await cache.clear_model("gpt-4o-mini")
 
 # Clear all
 await cache.clear()
@@ -202,12 +202,12 @@ Cache keys are generated from:
 
 ```python
 # These have DIFFERENT cache keys:
-await model.invoke("Hello", model="gpt-4.1-nano", temperature=0.7)
+await model.invoke("Hello", model="gpt-4o-mini", temperature=0.7)
 await model.invoke("Hello", model="gpt-4o", temperature=0.7)
 
 # These have the SAME cache key (temperature ignored for caching):
-await model.invoke("Hello", model="gpt-4.1-nano", temperature=0.7)
-await model.invoke("Hello", model="gpt-4.1-nano", temperature=0.5)
+await model.invoke("Hello", model="gpt-4o-mini", temperature=0.7)
+await model.invoke("Hello", model="gpt-4o-mini", temperature=0.5)
 ```
 
 ## Semantic Cache Details
@@ -257,7 +257,7 @@ for query in common_queries:
     response = await llm.ainvoke(query)
     await cache.set(
         messages=[{"role": "user", "content": query}],
-        model="gpt-4.1-nano",
+        model="gpt-4o-mini",
         response=response
     )
 ```

@@ -1,0 +1,52 @@
+export const docsRu: Record<string, string> = {
+  'search.placeholder': 'Поиск...',
+  'search.shortcut': '⌘K',
+  'search.full_placeholder': 'Поиск по документации...',
+  'search.unavailable': 'Поиск временно недоступен',
+  'search.no_results': 'Результаты не найдены',
+  'search.ai_search': 'AI-поиск',
+  'search.close': 'ESC для закрытия',
+  'search.type_to_search': 'Введите для поиска...',
+
+  'feedback.title': 'Была ли эта страница полезна?',
+  'feedback.yes': 'Да',
+  'feedback.no': 'Нет',
+  'feedback.thanks': 'Спасибо за отзыв!',
+  'feedback.sorry': 'Жаль это слышать. Как мы можем улучшить эту страницу?',
+  'feedback.input_placeholder': 'Что было непонятно или отсутствовало?',
+  'feedback.submit': 'Отправить отзыв',
+  'feedback.cancel': 'Отмена',
+
+  'error.title': 'Что-то пошло не так',
+  'error.description': 'Не удалось отобразить компонент.',
+  'error.retry': 'Повторить',
+  'error.not_found': 'Страница не найдена',
+  'error.not_found_desc': 'Запрашиваемая страница не существует или была перемещена.',
+  'error.back_to_docs': 'Вернуться к документации',
+
+  'footer.edit_page': 'Редактировать на GitHub',
+  'footer.copyright': '© {{year}} isA Platform. Открытый исходный код.',
+
+  'theme.light': 'Переключить на светлую тему',
+  'theme.dark': 'Переключить на тёмную тему',
+  'theme.light_label': 'Светлый режим',
+  'theme.dark_label': 'Тёмный режим',
+
+  'status.operational': 'Все системы работают',
+  'status.degraded': 'Снижение производительности',
+  'status.outage': 'Сбой сервиса',
+  'status.maintenance': 'Техническое обслуживание',
+  'status.uptime': 'Время работы:',
+  'status.response': 'Ответ:',
+
+  'common.loading': 'Загрузка...',
+  'common.send': 'Отправить запрос',
+  'common.sending': 'Отправка...',
+  'common.response': 'Ответ',
+  'common.show': 'Показать',
+  'common.hide': 'Скрыть',
+
+  'lang.en': 'English',
+  'lang.zh': '中文',
+  'lang.ru': 'Русский',
+};

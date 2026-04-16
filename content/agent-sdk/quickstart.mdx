@@ -30,7 +30,7 @@ For real-time streaming responses:
 from isa_agent_sdk import query, ISAAgentOptions
 
 options = ISAAgentOptions(
-    model="gpt-4.1-nano",
+    model="gpt-4o-mini",
     allowed_tools=["web_search", "read_file"]
 )
 
@@ -69,7 +69,7 @@ from isa_agent_sdk import query, ISAAgentOptions, ExecutionMode
 
 options = ISAAgentOptions(
     # Model settings
-    model="gpt-4.1-nano",
+    model="gpt-4o-mini",
 
     # Tool access
     allowed_tools=["web_search", "read_file", "write_file"],
@@ -102,7 +102,7 @@ options = ISAAgentOptions.from_file("agent_config.yaml")
 Example `agent_config.yaml`:
 
 ```yaml
-model: gpt-4.1-nano
+model: gpt-4o-mini
 allowed_tools:
   - web_search
   - read_file

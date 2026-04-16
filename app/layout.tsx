@@ -5,6 +5,7 @@ import 'nextra-theme-docs/style.css'
 import './globals.css'
 import { AISearch } from '../components/AISearch'
 import { ErrorBoundary } from '../components/ErrorBoundary'
+import { I18nWrapper } from '../components/I18nWrapper'
 import { PlatformNavBar } from '../components/PlatformNavBar'
 import { ThemeToggle } from '../components/ThemeToggle'
 import { community, getDocsRepositoryBase } from '../lib/surfaces'
@@ -89,6 +90,7 @@ export default async function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <Head faviconGlyph="+" />
       <body>
+        <I18nWrapper>
         <PlatformNavBar />
         <Layout
           navbar={
@@ -107,6 +109,7 @@ export default async function RootLayout({
         >
           {children}
         </Layout>
+        </I18nWrapper>
       </body>
     </html>
   )

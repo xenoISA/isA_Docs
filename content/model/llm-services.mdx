@@ -33,7 +33,7 @@ factory = AIFactory()
 llm = factory.get_service(
     service_type="text",
     provider="openai",
-    model="gpt-4.1-nano"
+    model="gpt-4o-mini"
 )
 
 # Get Cerebras service (fast inference)
@@ -216,7 +216,7 @@ openai:
   enabled: true
   api_key: ${OPENAI_API_KEY}
   api_base_url: https://api.openai.com/v1
-  default_model: gpt-4.1-nano
+  default_model: gpt-4o-mini
   temperature: 0.7
   max_tokens: 4096
 ```
@@ -228,7 +228,7 @@ openai:
 llm = factory.get_service(
     service_type="text",
     provider="openai",
-    model="gpt-4.1-nano",
+    model="gpt-4o-mini",
     temperature=0.5,
     max_tokens=2000
 )

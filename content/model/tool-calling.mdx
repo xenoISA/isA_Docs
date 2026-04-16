@@ -45,7 +45,7 @@ from isa_model import AsyncISAModel
 async with AsyncISAModel() as model:
     response = await model.invoke(
         input_data=[{"role": "user", "content": "What's the weather in Tokyo?"}],
-        model="gpt-4.1-nano",
+        model="gpt-4o-mini",
         provider="openai",
         service_type="text",
         task="chat",
@@ -69,7 +69,7 @@ curl -X POST http://localhost:8082/api/v1/invoke \
   -H "Content-Type: application/json" \
   -d '{
     "input_data": [{"role": "user", "content": "What is the weather in Tokyo?"}],
-    "model": "gpt-4.1-nano",
+    "model": "gpt-4o-mini",
     "provider": "openai",
     "service_type": "text",
     "task": "chat",
@@ -120,7 +120,7 @@ async def run_with_tools(user_message: str, tools: list):
         while True:
             response = await model.invoke(
                 input_data=messages,
-                model="gpt-4.1-nano",
+                model="gpt-4o-mini",
                 provider="openai",
                 service_type="text",
                 task="chat",
@@ -202,7 +202,7 @@ factory = AIFactory()
 llm = factory.get_service(
     service_type="text",
     provider="openai",
-    model="gpt-4.1-nano"
+    model="gpt-4o-mini"
 )
 
 # Bind tools to service
@@ -239,7 +239,7 @@ Tool calls are also supported in streaming mode:
 async with AsyncISAModel() as model:
     async for chunk in model.stream(
         input_data=[{"role": "user", "content": "What's the weather?"}],
-        model="gpt-4.1-nano",
+        model="gpt-4o-mini",
         provider="openai",
         tools=tools,
         stream=True
@@ -303,7 +303,7 @@ Tool calling is supported on:
 
 | Provider | Models |
 |----------|--------|
-| OpenAI | gpt-4.1-nano, gpt-4o, gpt-4o-mini, o4-mini |
+| OpenAI | gpt-4o-mini, gpt-4o, gpt-4o-mini, o4-mini |
 | Anthropic | claude-3-opus, claude-3-sonnet, claude-3-haiku |
 | YYDS | All GPT models (proxy) |
 | DeepSeek | deepseek-chat (with caveats) |
@@ -314,7 +314,7 @@ Tool calling is supported on:
 try:
     response = await model.invoke(
         input_data=messages,
-        model="gpt-4.1-nano",
+        model="gpt-4o-mini",
         tools=tools
     )
 except ValueError as e:
