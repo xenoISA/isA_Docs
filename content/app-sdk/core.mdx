@@ -1,0 +1,81 @@
+# @isa/core — Service Clients
+
+The `@isa/core` package provides typed service clients for all isA backend APIs.
+
+## Installation
+
+```bash
+pnpm add @isa/core
+```
+
+## AuthService
+
+Authentication and user management.
+
+```typescript
+import { AuthService } from '@isa/core';
+
+const auth = new AuthService('http://localhost:8201');
+
+// Login
+const { token, user } = await auth.login(email, password);
+
+// Register
+const { pending_id } = await auth.register(email, password, name);
+await auth.verifyRegistration(pending_id, code);
+
+// Token management
+auth.setAuthToken(token);
+const user = auth.getCurrentUser();
+const token = auth.getCurrentToken();
+auth.clearAuth();
+```
+
+## AgentService
+
+Agent lifecycle management.
+
+```typescript
+import { AgentService } from '@isa/core';
+
+const agents = new AgentService('http://localhost:8080');
+agents.setAuthToken(token);
+
+// CRUD
+const configs = await agents.listConfigs();
+const config = await agents.getConfig(id);
+const created = await agents.createConfig({ name, model_id, tools });
+await agents.updateConfig(id, { name: 'Updated' });
+await agents.deleteConfig(id);
+```
+
+## ModelService
+
+Model inference and management.
+
+```typescript
+import { ModelService } from '@isa/core';
+
+const models = new ModelService('http://localhost:8082');
+models.setAuthToken(token);
+
+// Chat completion
+const response = await models.chat({ model: 'gpt-4o', messages });
+
+// Streaming
+for await (const chunk of models.chatStream({ model, messages })) {
+  process.stdout.write(chunk.choices[0]?.delta?.content || '');
+}
+```
+
+## Other Services
+
+| Service | Port | Purpose |
+|---------|------|---------|
+| `SessionService` | 8203 | User session management |
+| `OrganizationService` | 8212 | Org CRUD, member management |
+| `BillingService` | 8216 | Usage recording, quota checks |
+| `PaymentService` | 8207 | Payment processing, subscriptions |
+| `MCPService` | 8081 | MCP tool/server/resource management |
+
+All services follow the same pattern: construct with URL, call `setAuthToken()`, then use typed methods.

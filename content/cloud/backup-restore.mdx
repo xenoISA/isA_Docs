@@ -1,0 +1,65 @@
+# Backup & Restore
+
+Procedures for backing up and restoring isA Cloud platform data.
+
+## Backup Strategy
+
+isA Cloud uses a multi-tier backup approach:
+
+| Tier | Method | Frequency | Retention |
+|------|--------|-----------|-----------|
+| Database | PostgreSQL pg_dump | Daily | 30 days |
+| Object Storage | MinIO mirror | Continuous | 90 days |
+| Configuration | Git (encrypted) | On change | Indefinite |
+| Secrets | Vault snapshots | Daily | 30 days |
+
+## Database Backup
+
+```bash
+# Manual backup
+kubectl exec -n isa-data postgresql-0 -- \
+  pg_dump -U isa_admin isa_platform | gzip > backup_$(date +%Y%m%d).sql.gz
+
+# Automated via CronJob (deployed in cluster)
+kubectl get cronjob -n isa-data pg-backup
+```
+
+## Restore Procedure
+
+```bash
+# 1. Stop dependent services
+kubectl scale deployment -n isa-platform --replicas=0 --all
+
+# 2. Restore database
+gunzip -c backup_20260415.sql.gz | \
+  kubectl exec -i -n isa-data postgresql-0 -- psql -U isa_admin isa_platform
+
+# 3. Restart services
+kubectl scale deployment -n isa-platform --replicas=1 --all
+
+# 4. Verify health
+curl http://localhost:8201/health  # auth
+curl http://localhost:8080/health  # agent
+```
+
+## Pod Disruption Budget (PDB)
+
+Critical services have PDB configured to prevent simultaneous pod evictions:
+
+```yaml
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: auth-service-pdb
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: auth-service
+```
+
+## Security Scanning
+
+- **Image scanning**: Trivy scans container images in CI before deployment
+- **Dependency audit**: Automated CVE checks via `pip audit` / `pnpm audit`
+- **Secret detection**: Pre-commit hooks prevent credential leaks

@@ -1,0 +1,111 @@
+# TypeScript Types
+
+Key types exported by `@isa/core`.
+
+## Auth Types
+
+```typescript
+interface LoginResponse {
+  token: string;
+  user_id: string;
+  email: string;
+}
+
+interface User {
+  user_id: string;
+  email: string;
+  name?: string;
+}
+```
+
+## Agent Types
+
+```typescript
+interface AgentConfig {
+  id: string;
+  name: string;
+  model_id: string;
+  system_prompt?: string;
+  tools: string[];
+  skills: string[];
+  mode: 'REACTIVE' | 'COLLABORATIVE' | 'PROACTIVE';
+  visibility?: 'private' | 'org' | 'public';
+  status?: string;
+  created_at: string;
+  updated_at?: string;
+}
+
+interface MultiAgentSpec {
+  id: string;
+  name: string;
+  entry_agent_id: string;
+  routing_type: 'dag' | 'round-robin' | 'priority';
+  execution_mode: 'sequential' | 'parallel';
+  routing_spec: {
+    agents: { agent_id: string; role: string; name: string }[];
+    edges: { from: string; to: string }[];
+    tasks: { id: string; title: string; agent: string }[];
+  };
+}
+```
+
+## Model Types
+
+```typescript
+interface ChatCompletionRequest {
+  model: string;
+  messages: { role: 'system' | 'user' | 'assistant'; content: string }[];
+  temperature?: number;
+  max_tokens?: number;
+  stream?: boolean;
+}
+
+interface Deployment {
+  id: string;
+  model_id: string;
+  status: 'running' | 'deploying' | 'failed' | 'stopped';
+  estimated_cost_per_hour?: number;
+  created_at: string;
+}
+```
+
+## MCP Types
+
+```typescript
+interface MCPServer {
+  id: string;
+  name: string;
+  url: string;
+  status: 'connected' | 'disconnected' | 'error';
+  tools_count: number;
+}
+
+interface MCPTool {
+  name: string;
+  description?: string;
+  inputSchema?: Record<string, unknown>;
+}
+
+interface MCPResource {
+  uri?: string;
+  name?: string;
+  description?: string;
+}
+```
+
+## Billing Types
+
+```typescript
+interface QuotaCheckRequest {
+  user_id?: string;
+  organization_id?: string;
+  service_type: string;
+  requested_amount: number;
+}
+
+interface UsageStatsResponse {
+  total_requests: number;
+  total_tokens: number;
+  total_cost: number;
+}
+```

@@ -6,6 +6,8 @@ export default {
   providers: 'Providers',
   caching: 'Caching',
   training: 'Fine-Tuning & Training',
+  'fine-tuning': 'LoRA & Custom Training',
+  datasets: 'Datasets',
   rbac: 'Access Control (RBAC)',
   billing: 'Billing & Credits',
   metering: 'Usage & Metering',

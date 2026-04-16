@@ -1,0 +1,51 @@
+# Agent Management
+
+Manage the full lifecycle of AI agents — create, configure, version, deploy, and monitor.
+
+## Agent List
+
+The agents dashboard (`/dashboard/agents`) shows all agents with:
+- Name, model, mode (Reactive/Collaborative/Proactive)
+- **Status badges** — color-coded: green (active), yellow (updating), red (failed)
+- Quick actions: edit, duplicate, delete
+
+## Creating Agents
+
+Three creation paths:
+
+### Basic Creator
+`/dashboard/agents/create` — form-based creation with fields for name, model, system prompt, tools, and skills.
+
+### Template Gallery
+`/dashboard/agents/templates` — pre-built agent templates (Research, Code Review, Customer Support, etc.) that can be customized.
+
+### Agent Dev Environment
+`/dashboard/agents/create/agent-dev` — advanced editor for building agents with full JSON config, testing, and iteration.
+
+## Agent Configuration
+
+Each agent config includes:
+
+| Field | Description |
+|-------|------------|
+| `name` | Display name |
+| `model_id` | LLM model (GPT-4o, Claude Sonnet, etc.) |
+| `system_prompt` | Behavior instructions |
+| `tools` | MCP tools the agent can use |
+| `skills` | Skill categories |
+| `mode` | REACTIVE, COLLABORATIVE, or PROACTIVE |
+| `visibility` | private, org, or public |
+
+## Version History & Diff Viewer
+
+`/dashboard/agents/[id]/versions` — view all config versions with timestamps and changed fields. Select two versions to see a **side-by-side JSON diff** with added (green), removed (red), and changed (yellow) highlighting.
+
+## Multi-Agent Specs
+
+`/dashboard/agents/multi` — create multi-agent teams with DAG-based routing. Define entry agents, routing edges, and task dependencies.
+
+## Monitoring
+
+Agent detail pages embed a monitoring section:
+- **Grafana iframe** when monitoring URL is configured
+- **"Not configured"** fallback with setup instructions

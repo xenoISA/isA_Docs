@@ -1,0 +1,63 @@
+# React Hooks
+
+React hooks for integrating isA services into frontend applications.
+
+## Auth Hooks
+
+```typescript
+import { useAuth } from '@/lib/auth-context';
+
+function MyComponent() {
+  const { user, isAuthenticated, login, logout } = useAuth();
+
+  if (!isAuthenticated) return <LoginForm onSubmit={login} />;
+  return <div>Welcome, {user.email}</div>;
+}
+```
+
+## Data Fetching with SWR
+
+Console uses SWR hooks for cached, revalidating data fetching:
+
+```typescript
+import useSWR from 'swr';
+import { getAgentAdminService } from '@/lib/services';
+
+function useAgents() {
+  return useSWR('agents', async () => {
+    const service = getAgentAdminService();
+    return service.listConfigs();
+  });
+}
+```
+
+## Custom Hooks
+
+| Hook | Purpose |
+|------|---------|
+| `useDashboardStats` | Dashboard overview stats (requests, tokens, costs) |
+| `useMCPOverview` | MCP platform health, servers, skills |
+| `useModelAdmin` | Model CRUD, deployments, training |
+| `useSessions` | User session management |
+| `useBillingStatus` | Subscription tier, credits, usage |
+| `useAgentForm` | Agent create/edit form state |
+| `usePlaygroundChat` | Playground chat state and streaming |
+
+## Pattern: Service + SWR
+
+```typescript
+// 1. Get singleton service instance
+const service = getModelAdminService();
+
+// 2. Wrap in SWR for caching
+const { data, error, mutate } = useSWR(
+  ['models', orgId],
+  () => service.listModels()
+);
+
+// 3. Mutations invalidate cache
+async function handleDelete(id: string) {
+  await service.deleteModel(id);
+  mutate(); // Refresh list
+}
+```

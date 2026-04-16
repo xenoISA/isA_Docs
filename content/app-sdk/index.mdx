@@ -1,195 +1,138 @@
 # isA App SDK
 
-Universal TypeScript SDK for building web, mobile, and IoT applications on the isA platform.
-
-## Overview
-
-isA App SDK is a modular pnpm monorepo providing 6 packages that work independently or together:
-
-| Package | Purpose |
-|---------|---------|
-| **@isa/core** | 21 service clients via unified `IsAClient` |
-| **@isa/transport** | Multi-protocol support (HTTP, MQTT, WebSocket, SSE) |
-| **@isa/hooks** | 40+ React hooks for Web and React Native |
-| **@isa/theme** | Design tokens and theming system |
-| **@isa/ui-web** | 28 React Web UI components |
-| **@isa/ui-native** | React Native UI components |
-
-## Quick Start
-
-```bash
-# Install the core SDK
-pnpm add @isa/core
-
-# Configure
-export GATEWAY_URL=http://localhost:80
-```
-
-```typescript
-import { IsAClient } from '@isa/core'
-
-const client = new IsAClient()
-
-// Authentication
-await client.auth.login({ email, password })
-
-// Use any of 21 service clients
-const devices = await client.device.list()
-const agents = await client.agent.chat("Hello!")
-const files = await client.storage.upload(file)
-```
-
-## Architecture
-
-```
-┌─────────────────────────────────────────────────┐
-│           Applications Layer                     │
-│     Web App  •  Mobile App  •  IoT  •  Server   │
-└──────────────────────┬──────────────────────────┘
-                       ↓
-┌─────────────────────────────────────────────────┐
-│              isA App SDK                         │
-│  ┌───────────────────────────────────────────┐  │
-│  │ @isa/core (21 service clients)            │  │
-│  ├───────────────────────────────────────────┤  │
-│  │ @isa/hooks  │ @isa/theme  │ @isa/ui-*    │  │
-│  ├───────────────────────────────────────────┤  │
-│  │ @isa/transport (HTTP, MQTT, WS, SSE)     │  │
-│  └───────────────────────────────────────────┘  │
-└──────────────────────┬──────────────────────────┘
-                       ↓
-┌─────────────────────────────────────────────────┐
-│          API Gateway (Port 80)                   │
-│          isA Microservices (8201-8250)           │
-└─────────────────────────────────────────────────┘
-```
+TypeScript SDK packages for the isA ecosystem across web, React Native, and device-facing clients.
 
 ## Packages
 
-### @isa/core
+| Package | Purpose |
+| --- | --- |
+| `@isa/core` | Service clients, shared types, `IsAClient`, auth, resilience |
+| `@isa/transport` | HTTP, MQTT, WebSocket, and SSE transport helpers |
+| `@isa/hooks` | React hooks built on top of `@isa/core` |
+| `@isa/theme` | Design tokens and theme objects |
+| `@isa/ui-web` | React web components |
+| `@isa/ui-native` | React Native components |
 
-Unified client with 21 service integrations:
+## Install
 
-| Category | Services |
-|----------|----------|
-| **Auth & Identity** | auth, account, session, authorization |
-| **AI & Agents** | agent, model, mcp |
-| **Commerce** | product, order, payment, wallet, billing |
-| **Storage & Media** | storage, album, media |
-| **Organization** | organization, invitation |
-| **IoT** | device, ota, telemetry |
-| **Other** | notification, calendar, task, weather, vault, memory |
+The `@isa` scope is currently configured for GitHub Packages.
 
-```typescript
-import { IsAClient, isaClient } from '@isa/core'
+```bash
+pnpm add @isa/core
+```
 
-// Singleton (recommended)
-const response = await isaClient.model.invoke({
-  model: "gpt-4o-mini",
-  messages: [{ role: "user", content: "Hello" }]
+If you are installing from GitHub Packages, configure your npm registry for the `@isa` scope before install.
+
+## Quick Start
+
+### `@isa/core`
+
+```ts
+import { IsAClient } from '@isa/core'
+
+const client = new IsAClient({
+  baseUrl: 'http://localhost:80',
+  resilience: { enabled: false },
 })
 
-// Or create a custom instance
-const client = new IsAClient({ baseUrl: "https://api.example.com" })
-```
+const login = await client.auth.login('user@example.com', 'password123')
 
-### @isa/transport
-
-Multi-protocol communication layer:
-
-```typescript
-import { HttpClient, MQTTClient, WebSocketClient, SSEClient } from '@isa/transport'
-
-// HTTP (default)
-const http = new HttpClient({ baseUrl: "http://localhost:80" })
-
-// MQTT for IoT real-time messaging
-const mqtt = new MQTTClient({ brokerUrl: "mqtt://localhost:1883" })
-await mqtt.subscribe("devices/+/status", (msg) => console.log(msg))
-
-// WebSocket for bidirectional streaming
-const ws = new WebSocketClient({ url: "ws://localhost:8080" })
-
-// SSE for server-sent events
-const sse = new SSEClient({ url: "http://localhost:8082/stream" })
-```
-
-### @isa/hooks
-
-React hooks for common patterns:
-
-```typescript
-import { useAuth, useChat, useIsAClient } from '@isa/hooks'
-
-function App() {
-  const { user, login, logout } = useAuth()
-  const { messages, send } = useChat()
-  const client = useIsAClient()
-
-  return <ChatInterface messages={messages} onSend={send} />
+if (login.success) {
+  const products = await client.product.getProducts()
+  const devices = await client.device.listDevices({ limit: 10 })
+  console.log(products, devices)
 }
 ```
 
-### @isa/ui-web
+### `@isa/transport`
 
-28 React components for agent and platform UIs:
+```ts
+import { HttpClient } from '@isa/transport'
 
-- **Agent**: AgentCard, AgentEditor, ArtifactViewer
-- **Chat**: ChatInput, ChatMessage, MarkdownRenderer
-- **Code**: CodeSandbox, PythonREPL (Sandpack + CodeMirror)
-- **Model**: ModelCard, ModelSelector
-- **Tools**: ToolBrowser, ToolCard, ToolDetail
-- **Voice**: VoiceUI with visualization
-- **HIL**: HILModal for human-in-the-loop approvals
+const http = new HttpClient({
+  baseURL: 'http://localhost:80',
+  headers: {
+    Authorization: 'Bearer token',
+  },
+})
 
-### @isa/theme
-
-Design token system:
-
-```typescript
-import { ThemeProvider } from '@isa/theme'
-import { colors } from '@isa/theme/colors'
-import { spacing } from '@isa/theme/spacing'
-import { typography } from '@isa/theme/typography'
+const products = await http.get('/api/v1/product/products')
+console.log(products)
 ```
 
-## Installation
+### `@isa/hooks`
 
-**Prerequisites:** Node.js 18+, pnpm 8+
+`useAuth` expects an `AuthService` instance.
+
+```tsx
+import { AuthService } from '@isa/core'
+import { useAuth } from '@isa/hooks'
+
+const authService = new AuthService({ baseUrl: 'http://localhost:80' })
+
+function AuthPanel() {
+  const { isAuthenticated, user, login, logout, isLoading, error } = useAuth({
+    authService,
+  })
+
+  return (
+    <div>
+      {isAuthenticated ? (
+        <>
+          <p>Signed in as {user?.email}</p>
+          <button onClick={logout}>Logout</button>
+        </>
+      ) : (
+        <button onClick={() => login('user@example.com', 'password123')}>
+          Login
+        </button>
+      )}
+      {isLoading && <p>Loading...</p>}
+      {error && <p>{error}</p>}
+    </div>
+  )
+}
+```
+
+### `@isa/ui-web`
+
+```tsx
+import { ChatInput, MarkdownRenderer } from '@isa/ui-web'
+
+function ChatExample() {
+  return (
+    <div>
+      <MarkdownRenderer content="**Hello from isA**" />
+      <ChatInput onSend={(value) => console.log(value)} />
+    </div>
+  )
+}
+```
+
+### `@isa/theme`
+
+`@isa/theme` exports tokens and theme objects rather than a framework-specific provider.
+
+```ts
+import { colors, spacing, typography, lightTheme } from '@isa/theme'
+
+console.log(colors.primary[500], spacing[4], typography.fontSizes.base, lightTheme)
+```
+
+## Local Development
 
 ```bash
-# Individual packages
-pnpm add @isa/core
-pnpm add @isa/hooks @isa/theme        # React apps
-pnpm add @isa/ui-web                   # Web components
-pnpm add @isa/ui-native               # React Native
-
-# Development (monorepo)
 git clone https://github.com/xenoISA/isA_App_SDK
-pnpm install && pnpm build && pnpm dev
+cd isA_App_SDK
+pnpm install
+pnpm typecheck
+pnpm lint
+pnpm test
+pnpm build
 ```
 
-## Environment Variables
+## Notes
 
-```bash
-GATEWAY_URL=http://localhost:80        # API gateway URL
-# Or individual components:
-GATEWAY_HOST=localhost
-GATEWAY_PORT=80
-GATEWAY_PROTOCOL=http
-
-# Optional protocols
-MQTT_BROKER_URL=mqtt://localhost:1883
-WS_URL=ws://localhost:8080
-```
-
-## Tech Stack
-
-| Tool | Purpose |
-|------|---------|
-| TypeScript 5.3 | Language (strict mode) |
-| pnpm 8.15+ | Package manager |
-| tsup | Bundler (CJS + ESM output) |
-| Vitest | Unit/integration tests |
-| Playwright | E2E tests |
-| Tailwind CSS | UI styling (ui-web) |
+- Consumer apps should import `@isa/*` packages directly and avoid local aliases to SDK `dist` folders.
+- The root SDK `build` command validates publishable packages; example apps can be built separately when needed.
+- Release validation currently targets GitHub Packages, matching the package metadata in the SDK repo.

@@ -1,0 +1,51 @@
+# Configuration
+
+Configure SDK service clients for different environments.
+
+## Gateway Configuration
+
+The SDK uses `gatewayConfig.ts` to define service endpoints:
+
+```typescript
+import { GATEWAY_ENDPOINTS, DEFAULT_GATEWAY_SERVICES } from '@isa/core';
+
+// Default endpoints resolve from environment variables
+// AUTH: /api/v1/auth
+// AGENTS: /api/v1/agents
+// MODELS: /api/v1/models
+// MCP: /api/v1/mcp
+```
+
+## Environment Configuration
+
+```typescript
+import { environmentConfig } from '@isa/core';
+
+// Auto-detects environment from NEXT_PUBLIC_ISA_ENV
+const config = environmentConfig();
+// Returns: { apiUrl, authUrl, consoleUrl, docsUrl, environment }
+```
+
+## Service URLs
+
+In development, Console uses Next.js rewrites to proxy service URLs:
+
+```bash
+# .env.local
+AUTH_SERVICE_URL=http://localhost:8201
+AGENT_SERVICE_URL=http://localhost:8080
+MODEL_SERVICE_URL=http://localhost:8082
+MCP_SERVICE_URL=http://localhost:8081
+```
+
+In production, services communicate directly through the API gateway (APISIX).
+
+## Platform Configuration
+
+```typescript
+import { platformConfig } from '@isa/core';
+
+// Platform-wide settings
+const platform = platformConfig();
+// Returns: { name, version, supportedModels, features }
+```
