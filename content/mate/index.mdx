@@ -14,6 +14,13 @@ isA Mate is the default agent application of the isA platform. It runs on the us
 | **Skills** | Modular capability system with auto-discovery |
 | **Modes** | Reactive, collaborative, proactive |
 
+## Latest Updates (2026-05-17)
+
+- Local development startup now waits for the gateway `/health` endpoint before reporting readiness.
+- OpenTelemetry trace context is propagated through the FastAPI gateway and channel senders.
+- A2A delegation, event subscriptions, background jobs, and declarative DAG workflows are available for longer-running automation.
+- Browser human-in-the-loop checks protect risky actions during real end-to-end flows.
+
 ## Quick Start
 
 ```bash
@@ -97,6 +104,16 @@ Custom skills are auto-discovered from `~/.isa/skills/`.
 | **Slack** | Planned | — |
 | **WhatsApp** | Planned | — |
 
+## Automation Surfaces
+
+| Surface | Purpose |
+|---------|---------|
+| A2A delegation | Route tasks to peer agents through a delegation facade |
+| Background jobs | Run autonomous work outside a foreground chat request |
+| Event subscriptions | Subscribe channel adapters and automations to runtime events |
+| DAG workflows | Define multi-step automation as declarative workflow graphs |
+| Browser HIL | Require human review before sensitive browser actions |
+
 ## Gateway API
 
 Base URL: `http://127.0.0.1:18789`
@@ -106,6 +123,7 @@ Base URL: `http://127.0.0.1:18789`
 | `GET` | `/health` | Health check |
 | `GET` | `/v1/tools` | List available tools |
 | `GET` | `/v1/skills` | List loaded skills |
+| `GET` | `/v1/autonomous/background-jobs` | List autonomous background jobs |
 | `POST` | `/v1/query` | Send a query (non-streaming) |
 | `POST` | `/v1/chat` | Chat with SSE streaming |
 | `WS` | `/ws` | WebSocket connection |

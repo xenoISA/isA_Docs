@@ -252,6 +252,67 @@ curl -X POST http://localhost:8082/api/v1/models/inference/ml/prediction/models/
 
 List prediction runs for a model. Supports pagination (`limit`, `offset`).
 
+## Sleep Intelligence
+
+Sleep intelligence routes are mounted under `/api/v1/sleep` and are used by the commercial sleep model products.
+
+### POST `/api/v1/sleep/evaluate`
+
+Evaluate sleep quality and related sleep-health signals.
+
+```bash
+curl -X POST http://localhost:8082/api/v1/sleep/evaluate \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -d '{
+    "user_id": "user_123",
+    "mode": "fast",
+    "session_data": {
+      "duration_min": 430,
+      "stage_durations": {
+        "W": 32,
+        "N1": 48,
+        "N2": 210,
+        "N3": 72,
+        "REM": 68
+      },
+      "movement_score": 0.18
+    }
+  }'
+```
+
+### POST `/api/v1/sleep/recommend`
+
+Generate recommendations from sleep evaluation inputs or model outputs.
+
+```bash
+curl -X POST http://localhost:8082/api/v1/sleep/recommend \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -d '{
+    "user_id": "user_123",
+    "sleep_history": [
+      {
+        "business_date": "2026-05-16",
+        "quality_score": 7.2,
+        "stage_distribution": {
+          "n1": 0.12,
+          "n2": 0.49,
+          "n3": 0.17,
+          "rem": 0.16,
+          "wake": 0.06
+        }
+      }
+    ],
+    "goals": ["improve_quality"],
+    "context": {
+      "screen_time_before_bed_min": 90
+    }
+  }'
+```
+
+Registered commercial model products include `com_sleep_quality`, `com_sleep_stage`, and `com_health_risk`.
+
 ## Voice & Realtime
 
 ### POST `/realtime/sessions`

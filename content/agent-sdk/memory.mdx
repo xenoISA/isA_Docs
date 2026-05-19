@@ -93,6 +93,23 @@ memories = await execute_tool("get_active_working_memories", {})
 
 For persistent knowledge that spans sessions, the SDK integrates with the isA MCP memory service:
 
+### MemoryStack Helpers
+
+Recent SDK builds expose MemoryStack helpers for listing stored memories and retrieving aggregate health/statistics data:
+
+```python
+from isa_agent_sdk.stack.memory_stack import MemoryStack
+
+memory = MemoryStack()
+await memory.start()
+
+items = await memory.list_memories(user_id="user_123", limit=20)
+stats = await memory.get_stats(user_id="user_123")
+await memory.stop()
+```
+
+Use `list_memories` for inspection and debugging. Use `get_stats` when dashboards or health checks need summarized memory counts, backend state, or capacity signals.
+
 ### Factual Memory
 
 Store facts about users, projects, or domains:

@@ -6,6 +6,10 @@ AI-powered cognitive memory system for intelligent agents.
 
 The memory_service (port 8223) implements a sophisticated multi-layered cognitive memory system inspired by human memory architecture.
 
+## Latest Updates (2026-05-17)
+
+- Memory service now exposes aggregate stats through `GET /api/v1/memories/stats?user_id=...`.
+
 ## Memory Types
 
 | Memory Type | Description | Storage | Retrieval |
@@ -140,6 +144,15 @@ curl -X POST "http://localhost:8223/api/v1/memory/search" \
     "limit": 10
   }'
 ```
+
+## Memory Stats
+
+```bash
+curl "http://localhost:8223/api/v1/memories/stats?user_id=user_123" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+```
+
+The stats response summarizes memory-service state for the requested user and is useful for health dashboards, debugging, and agent memory audits.
 
 ## Memory Consolidation
 

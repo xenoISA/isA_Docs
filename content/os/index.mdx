@@ -14,6 +14,13 @@ isA OS provides a unified platform for AI agents to interact with computing reso
 | Python REPL | Code execution sandbox | 8001 |
 | Web Services | Web automation | 8000 |
 
+## Latest Updates (2026-05-17)
+
+- Python REPL and Code REPL now expose streaming execution routes for long-running code output.
+- Cloud OS exposes WebSocket command streaming for VM execution.
+- Web Automation now registers as an A2A service for agent-driven browser work.
+- Pool Manager exports Prometheus metrics for active, warm, idle, max, healthy, utilization, and queue-depth resource state.
+
 ## Architecture
 
 ```
@@ -73,6 +80,8 @@ Isolated Python code execution:
 - Multiple providers (E2B, Local, Docker)
 - Session state persistence
 - Fast execution (< 200ms with E2B)
+- Streaming execution via `POST /execute/stream`
+- Code REPL streaming via `POST /api/v1/code-repl/execute/stream`
 
 ### Web Services
 Web automation capabilities:
@@ -80,6 +89,15 @@ Web automation capabilities:
 - Web search (Brave API, AI summaries)
 - Deep search (multi-strategy, RAG)
 - Browser automation (LLM-driven)
+- A2A service registration for delegated web automation
+
+### Streaming Execution
+
+| Service | Route | Protocol |
+|---------|-------|----------|
+| Python REPL | `POST /execute/stream` | HTTP streaming |
+| Code REPL | `POST /api/v1/code-repl/execute/stream` | HTTP streaming |
+| Cloud OS | `WS /api/v1/vms/{vm_id}/execute/stream` | WebSocket |
 
 ## Service Comparison
 

@@ -14,8 +14,12 @@ ISA MCP provides:
 - Standalone enterprise MCP servers
 - Multi-tenant isolation and security controls
 
-## Latest Updates (2026-04-08)
+## Latest Updates (2026-05-09)
 
+- **Kubernetes liveness endpoint** added at `/live` so probes can distinguish process liveness from dependency readiness.
+- **Runtime branding support** added for white-label deployments and non-interactive rebrand flows.
+- **Backup/restore scripts and SOPs** added for MCP runtime recovery.
+- **Disaster-recovery docs** started with an operator dependency map and chart-hardening notes.
 - **Health semantics refresh** so `/health` now distinguishes healthy, degraded, and unready states.
 - **Search degradation support** so the platform falls back to lexical search if the semantic model dependency is unavailable.
 - **Enterprise MCP server docs** for the dedicated API gateway, database, filesystem, and message queue servers.
@@ -136,6 +140,7 @@ Base URL: `http://localhost:8081`
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/mcp` | POST | MCP JSON-RPC endpoint |
+| `/live` | GET | Kubernetes liveness check |
 | `/health` | GET | Server health check |
 | `/search` | POST | Semantic search |
 | `/api/v1/search` | POST | Hierarchical search with skill routing |

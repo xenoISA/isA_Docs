@@ -6,7 +6,11 @@ AI-SDLC Platform — autonomous end-to-end software development orchestration wi
 
 isA Vibe is a full AI-SDLC platform that orchestrates the complete software development lifecycle — from initial research through deployment and ongoing operations. It uses 24 specialized agents organized in 4 phases (Research, TDD, Deploy, Ops) and supports multiple project types (Python services, React apps, data pipelines, multi-agent systems), even when `config/vibe.yaml` is missing.
 
-## Latest Updates (2026-02-14)
+## Latest Updates (2026-05-17)
+
+- `isa-vibe --list-workflows` now fills legacy defaults instead of crashing when older configuration fields are absent.
+
+## Earlier Updates (2026-02-14)
 
 - **Generic project support** improved for any repo layout.
 - **Backlog automation** expanded via CLI flows for backlog readiness, dispatch, status, and watch mode.
@@ -88,4 +92,3 @@ security_result = await scan_project("/path/to/repo")
 log_result = await search_logs(service="auth", query="ERROR", limit=50)
 migration_result = await migration_validate("/path/to/repo")
 ```
-

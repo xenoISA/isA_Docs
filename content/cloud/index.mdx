@@ -13,6 +13,13 @@ isA Cloud provides unified microservices infrastructure with:
 - **Multi-environment** support (dev, staging, production)
 - **42+ microservices** orchestration
 
+## Latest Updates (2026-05-17)
+
+- Big-data foundation validation now covers Kafka, PostgreSQL big-data metadata, Hive Metastore, MinIO, Iceberg tools, StarRocks, Apicurio Registry, Flink, Fluss, and Flink CDC jobs on local KIND.
+- New Make targets orchestrate setup, readiness, smoke validation, and teardown for the datalake stack.
+- Chart coverage now includes cert-manager, External Secrets Operator, and Prometheus Operator.
+- Datalake setup preflights cert-manager CRDs and fails fast when required platform dependencies are missing.
+
 ## Architecture
 
 ```
@@ -82,6 +89,23 @@ isA Cloud provides unified microservices infrastructure with:
 | **Storage** | MinIO (S3-compatible) |
 | **Vectors** | Qdrant |
 | **Observability** | Loki, Grafana, Prometheus |
+
+## Big-Data Foundation
+
+The local KIND big-data stack validates data-lake and streaming infrastructure before higher-level data products depend on it.
+
+| Component | Purpose |
+|-----------|---------|
+| Kafka | Event streaming backbone |
+| PostgreSQL big-data metadata | Metadata store for lake services |
+| Hive Metastore | Table metadata catalog |
+| MinIO | S3-compatible lake storage |
+| Iceberg tools | Table format utilities |
+| StarRocks | Analytical query engine |
+| Apicurio Registry | Schema registry |
+| Flink | Stream processing |
+| Fluss | Streaming lakehouse layer |
+| Flink CDC jobs | Change-data-capture pipelines |
 
 ## Environments
 

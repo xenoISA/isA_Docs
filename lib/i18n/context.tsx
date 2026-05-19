@@ -13,10 +13,10 @@ import {
   setLocale as coreSetLocale,
   getLocale,
   getAvailableLocales,
-  onLocaleChange,
 } from '@isa/core';
-import type { InterpolationValues } from '@isa/core';
 import { docsEn, docsZh, docsRu } from './locales';
+
+type InterpolationValues = Record<string, string | number>;
 
 const docsLocales: Record<string, Record<string, string>> = {
   en: docsEn,
@@ -36,8 +36,8 @@ function interpolate(
 
 interface I18nContextValue {
   locale: string;
-  setLocale: (locale: string) => void;
-  t: (key: string, values?: InterpolationValues) => string;
+  setLocale: (...args: [string]) => void;
+  t: (...args: [string, InterpolationValues?]) => string;
   availableLocales: string[];
 }
 
@@ -50,17 +50,13 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     const stored = typeof window !== 'undefined' ? localStorage.getItem('isa.locale') : null;
     if (stored && ['en', 'zh', 'ru'].includes(stored)) {
       coreSetLocale(stored);
+      setLocaleState(stored);
     }
-  }, []);
-
-  useEffect(() => {
-    return onLocaleChange((newLocale: string) => {
-      setLocaleState(newLocale);
-    });
   }, []);
 
   const setLocale = useCallback((newLocale: string) => {
     coreSetLocale(newLocale);
+    setLocaleState(newLocale);
     if (typeof window !== 'undefined') {
       localStorage.setItem('isa.locale', newLocale);
     }

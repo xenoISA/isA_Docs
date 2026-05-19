@@ -2,6 +2,80 @@
 
 All notable changes to the isA platform.
 
+## v0.9.0 — May 17, 2026
+
+### Platform Shell and Connectors
+
+- **[New]** Per-connector policies and evaluator support in the main isA app.
+- **[New]** Conversation tool-request plumbing and interactive connector surfaces.
+- **[Updated]** Claude parity certification flow for connector behavior.
+
+### isA_App_SDK
+
+- **[New]** `@isa/service-agents` package for embeddable vertical service agents.
+- **[New]** Web widget bundle (`service-agents-widget.js`) with `window.IsAServiceAgents` initialization and Shadow DOM isolation.
+- **[New]** Service-agent gateway endpoints for listing agents and sending chat messages.
+- **[New]** A2UI interaction contracts for knobs, color pickers, 2D sliders, draggable cards, drop zones, comparison grids, annotated diffs, and flow diagrams.
+
+### isA_Console
+
+- **[New]** Customer service control plane under `/dashboard/customer-service`.
+- **[New]** Agent prompt, knowledge, conversation, and deployment management pages.
+- **[Updated]** Developer console pages for API keys, webhooks, SDKs, code examples, settings, and personalized quickstart snippets.
+
+### isA_Model
+
+- **[New]** Sleep intelligence API mounted under `/api/v1/sleep`.
+- **[New]** Sleep evaluation and recommendation routes: `/api/v1/sleep/evaluate` and `/api/v1/sleep/recommend`.
+- **[New]** Commercial sleep model products: `com_sleep_quality`, `com_sleep_stage`, and `com_health_risk`.
+- **[New]** Commercial model serving evidence gate script for validating model products before release.
+
+### isA_Data
+
+- **[New]** Framework data-product marketplace search, product detail, and subscribe flows.
+- **[New]** Certification report APIs and policy-evaluation support for data products.
+- **[New]** Support and trust cards for marketplace listings.
+- **[Updated]** Canonical product identifiers and framework schema bundle/versioning.
+
+### isA_Cloud
+
+- **[New]** Big-data foundation stack for local KIND validation: Kafka, PostgreSQL big-data metadata, Hive Metastore, MinIO, Iceberg tools, StarRocks, Apicurio Registry, Flink, Fluss, and Flink CDC jobs.
+- **[New]** Validation targets: `setup-datalake-kind`, `verify-bigdata-kind`, `verify-bigdata-kind-readiness`, `verify-bigdata-kind-smoke`, and `teardown-bigdata-kind`.
+- **[Updated]** Chart coverage now includes cert-manager, External Secrets Operator, and Prometheus Operator hardening.
+
+### isA_MCP
+
+- **[New]** `/live` liveness endpoint for Kubernetes probes.
+- **[New]** Runtime configurable branding for white-label deployments.
+- **[New]** Backup/restore scripts and disaster-recovery runbook scaffolding.
+- **[Updated]** Liveness probes and chart hardening documentation.
+
+### isA_Mate
+
+- **[New]** OpenTelemetry tracing propagation across the gateway and channel senders.
+- **[New]** A2A delegation facade, event subscriptions, background jobs, and declarative DAG workflow configuration.
+- **[Updated]** Local development readiness now gates on `/health`; risky browser actions support human-in-the-loop review.
+
+### isA_OS
+
+- **[New]** Streaming execution surfaces for Python REPL, Code REPL, and Cloud OS.
+- **[New]** Web Automation A2A service.
+- **[New]** Pool Manager Prometheus metrics for active, warm, idle, max, healthy, utilization, and queue-depth resource state.
+
+### isA_user
+
+- **[New]** Memory service stats endpoint: `GET /api/v1/memories/stats?user_id=...`.
+
+### isA_Agent_SDK
+
+- **[New]** Model usage counters for model calls, input tokens, output tokens, and cost.
+- **[New]** MemoryStack list and stats helpers.
+- **[Updated]** Human-in-the-loop query APIs and interrupt checkpoint support.
+
+### isA_Vibe
+
+- **[Fixed]** `isa-vibe --list-workflows` now fills legacy defaults instead of crashing when older configuration fields are absent.
+
 ## v0.8.0 — April 11, 2026
 
 ### isA_Console — Developer Platform Parity

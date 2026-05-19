@@ -12,6 +12,14 @@ TypeScript SDK packages for the isA ecosystem across web, React Native, and devi
 | `@isa/theme` | Design tokens and theme objects |
 | `@isa/ui-web` | React web components |
 | `@isa/ui-native` | React Native components |
+| `@isa/service-agents` | Embeddable vertical service-agent widgets and gateway clients |
+
+## Latest Updates (2026-05-17)
+
+- `@isa/service-agents` adds an embeddable web widget for service-agent chat surfaces.
+- The gateway exposes agent discovery and channel-aware chat routes under `/api/v1/service-agents`.
+- The widget bundle mounts from `window.IsAServiceAgents` and uses Shadow DOM isolation for host-page safety.
+- A2UI contracts now include richer controls and layouts: `Knob`, `ColorPicker`, `RangeSlider2D`, `DraggableCard`, `DropZone`, `ComparisonGrid`, `AnnotatedDiff`, and `FlowDiagram`.
 
 ## Install
 
@@ -118,6 +126,28 @@ import { colors, spacing, typography, lightTheme } from '@isa/theme'
 
 console.log(colors.primary[500], spacing[4], typography.fontSizes.base, lightTheme)
 ```
+
+### `@isa/service-agents`
+
+```html
+<script src="/service-agents-widget.js"></script>
+<script>
+  window.IsAServiceAgents.mount({
+    endpoint: "http://localhost:3000",
+    defaultAgentId: "sleep-advisor",
+    title: "Ask our team"
+  })
+</script>
+```
+
+Gateway routes:
+
+| Method | Route | Purpose |
+| --- | --- | --- |
+| `GET` | `/healthz` | Widget gateway health |
+| `GET` | `/api/v1/service-agents` | List available service agents |
+| `POST` | `/api/v1/service-agents/:agentId/chat` | Send a chat message |
+| `POST` | `/api/v1/service-agents/:agentId/chat/:channel` | Send a channel-specific chat message |
 
 ## Local Development
 

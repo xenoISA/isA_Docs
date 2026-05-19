@@ -14,6 +14,14 @@ isA Data provides a unified platform for knowledge management and structured dat
 | **Multi-Modal** | PDF, Image, Audio, Video processing |
 | **Data Products** | Self-service analytics with quality guarantees |
 
+## Latest Updates (2026-05-17)
+
+- Framework data-product marketplace now supports product search, product detail, and subscribe flows.
+- Certification report APIs expose product readiness evidence for marketplace listings.
+- Policy evaluation gates data-product status transitions and certification decisions.
+- Support and trust cards surface operational and governance context in marketplace results.
+- Canonical product IDs and framework schema bundle/versioning are now part of the data-product contract.
+
 ## Architecture
 
 ```
@@ -82,6 +90,20 @@ Natural language to SQL translation for self-service analytics:
 - Schema-aware query generation
 - Metadata embedding for discovery
 - Result formatting and visualization
+
+### Data Product Marketplace
+
+Framework data products can be discovered, certified, and subscribed to through the catalog API.
+
+| Method | Route | Purpose |
+|--------|-------|---------|
+| `GET` | `/api/v1/data/catalog/framework/marketplace/products` | Search marketplace products |
+| `GET` | `/api/v1/data/catalog/framework/marketplace/products/{product_id}` | Read product detail |
+| `POST` | `/api/v1/data/catalog/framework/marketplace/products/{product_id}/subscribe` | Subscribe to a product |
+| `GET` | `/api/v1/data/catalog/framework/products/{product_id}/certification` | Read certification state |
+| `POST` | `/api/v1/data/catalog/framework/products/{product_id}/certification/report` | Submit certification evidence |
+| `GET` | `/api/v1/data/catalog/framework/products/{product_id}/certification/report` | Read certification report |
+| `POST` | `/api/v1/data/catalog/framework/products/{product_id}/status` | Request or apply a product status transition |
 
 ### File Processing
 

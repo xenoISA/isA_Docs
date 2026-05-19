@@ -21,7 +21,15 @@ async with AsyncISAModel(base_url="http://localhost:8082") as client:
     print(response.choices[0].message.content)
 ```
 
-## Latest Updates (2026-02-14)
+## Latest Updates (2026-05-17)
+
+- **Sleep intelligence APIs added** under `/api/v1/sleep`.
+- **Sleep evaluation endpoint added**: `POST /api/v1/sleep/evaluate`.
+- **Sleep recommendation endpoint added**: `POST /api/v1/sleep/recommend`.
+- **Commercial sleep model products registered**: `com_sleep_quality`, `com_sleep_stage`, and `com_health_risk`.
+- **Commercial model evidence gate added** to validate serving behavior before release.
+
+## Earlier Updates (2026-02-14)
 
 - **Generic ML prediction API added** with dedicated training and inference routes.
 - **Prediction endpoint pagination added** (`limit` / `offset`) for model and prediction lists.
@@ -72,6 +80,12 @@ async with AsyncISAModel(base_url="http://localhost:8082") as client:
 - Inference endpoint for forecasts
 - Tenant-scoped prediction history with pagination
 
+### Sleep Intelligence
+
+- Sleep-quality evaluation
+- Sleep-stage recommendation
+- Health-risk assessment products for commercial serving flows
+
 ## API Endpoints
 
 Base URL: `http://localhost:8082`
@@ -114,6 +128,13 @@ Base URL: `http://localhost:8082`
 | `/api/v1/models/training/ml/prediction/models/{model_id}` | DELETE | Delete prediction model |
 | `/api/v1/models/inference/ml/prediction/models/{model_id}/predict` | POST | Run prediction |
 | `/api/v1/models/inference/ml/prediction/models/{model_id}/predictions` | GET | List prediction runs (`limit`, `offset`) |
+
+### Sleep
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/v1/sleep/evaluate` | POST | Evaluate sleep quality and related signals |
+| `/api/v1/sleep/recommend` | POST | Generate sleep-stage or health recommendations |
 
 ## Prediction Example
 
@@ -320,4 +341,3 @@ curl -X POST http://localhost:8082/realtime/sessions/{session_id}/interrupt
 | `REDIS_URL` | Redis URL for caching |
 | `QDRANT_URL` | Qdrant URL for semantic cache |
 | `NATS_URL` | NATS URL for events |
-

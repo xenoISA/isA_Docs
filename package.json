@@ -22,7 +22,16 @@
   "author": "isA Team",
   "license": "MIT",
   "dependencies": {
+    "@isa/core": "file:../isA_App_SDK/packages/core",
     "@isa/ui-web": "file:../isA_App_SDK/packages/ui-web",
+    "@opentelemetry/auto-instrumentations-web": "^0.59.0",
+    "@opentelemetry/core": "^2.6.1",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.214.0",
+    "@opentelemetry/instrumentation": "^0.214.0",
+    "@opentelemetry/resources": "^2.6.1",
+    "@opentelemetry/sdk-trace-base": "^2.6.1",
+    "@opentelemetry/sdk-trace-web": "^2.6.1",
+    "@opentelemetry/semantic-conventions": "^1.40.0",
     "@tailwindcss/postcss": "^4.1.18",
     "ioredis": "^5.10.1",
     "next": "^16.1.5",
@@ -30,7 +39,8 @@
     "nextra-theme-docs": "^4.6.1",
     "pg": "^8.20.0",
     "react": "^19.2.4",
-    "react-dom": "^19.2.4"
+    "react-dom": "^19.2.4",
+    "web-vitals": "^5.2.0"
   },
   "devDependencies": {
     "@types/node": "20.19.30",

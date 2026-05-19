@@ -44,6 +44,20 @@ Operational tools include:
 | Loki | 3100 |
 | Vault | 8200 |
 
+### Big-Data KIND Validation
+
+Use the Make targets from the `isA_Cloud` repo root to stand up and verify the local datalake foundation:
+
+```bash
+make setup-datalake-kind
+make verify-bigdata-kind
+make verify-bigdata-kind-readiness
+make verify-bigdata-kind-smoke
+make teardown-bigdata-kind
+```
+
+The setup flow preflights cert-manager CRDs before deploying the datalake stack. The verification flow checks readiness and smoke behavior for Kafka, PostgreSQL big-data metadata, Hive Metastore, MinIO, Iceberg tools, StarRocks, Apicurio Registry, Flink, Fluss, and Flink CDC jobs.
+
 ## Backup
 
 The platform provides two tiers of backup tooling: **automated scripts** that back up all 8 data stores in a single run, and **per-service manual commands** for targeted operations.

@@ -6,6 +6,13 @@ Web-based management dashboard for agents, models, MCP tools, and platform admin
 
 isA Console is a Next.js 16 application (React 19) that provides a unified control center for the isA platform. It integrates with App SDK packages (`@isa/core`, `@isa/hooks`, `@isa/theme`, `@isa/ui-web`) and proxies 8 backend services.
 
+## Latest Updates (2026-05-17)
+
+- Customer service agents now have a dedicated control plane under `/dashboard/customer-service`.
+- Per-agent prompt, knowledge, conversation, and deployment pages support the service-agent workflow.
+- Developer pages now cover API keys, webhooks, SDKs, code examples, settings, and personalized quickstart snippets.
+- Console API routes proxy customer-service agent, conversation, and model operations.
+
 ## Quick Start
 
 ```bash
@@ -70,6 +77,16 @@ pnpm run dev
 /dashboard/mcp/*           MCP servers, tools, skills, prompts, resources
 /dashboard/models/*        Catalog, deployments, training, evaluation, analytics
 /dashboard/agents/*        Agent management, creation, templates, multi-agent
+/dashboard/customer-service
+/dashboard/customer-service/[id]/prompt
+/dashboard/customer-service/[id]/knowledge
+/dashboard/customer-service/[id]/conversations
+/dashboard/customer-service/[id]/deployment
+/dashboard/developer/api-keys
+/dashboard/developer/webhooks
+/dashboard/developer/sdks
+/dashboard/developer/code-examples
+/dashboard/developer/settings
 /dashboard/api-keys        API key management
 /dashboard/usage           Usage analytics
 /dashboard/subscription    Billing & plans

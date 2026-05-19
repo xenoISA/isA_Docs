@@ -85,6 +85,17 @@ m = tracing_metrics()
 | `mcp_fallback_activation_count` | Times fallback activated |
 | `mcp_fallback_cached_tools` | Cached tool schemas |
 
+### Model Usage
+
+Recent SDK counters expose model-call volume, token usage, and cost attribution for agent runs.
+
+| Metric | Description |
+|--------|-------------|
+| `model_calls` | Number of model calls issued by the agent runtime |
+| `tokens_in` | Input tokens sent to model providers |
+| `tokens_out` | Output tokens returned by model providers |
+| `cost` | Accumulated model cost reported by the provider or billing adapter |
+
 ## Alerting Rules
 
 ### Critical (P0)
