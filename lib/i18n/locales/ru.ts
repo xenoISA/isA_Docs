@@ -25,7 +25,7 @@ export const docsRu: Record<string, string> = {
   'error.back_to_docs': 'Вернуться к документации',
 
   'footer.edit_page': 'Редактировать на GitHub',
-  'footer.copyright': '© {{year}} isA Platform. Открытый исходный код.',
+  'footer.copyright': '© {{year}} {{brand}}. Открытый исходный код.',
 
   'theme.light': 'Переключить на светлую тему',
   'theme.dark': 'Переключить на тёмную тему',

@@ -8,18 +8,18 @@ import { ErrorBoundary } from '../components/ErrorBoundary'
 import { I18nWrapper } from '../components/I18nWrapper'
 import { PlatformNavBar } from '../components/PlatformNavBar'
 import { ThemeToggle } from '../components/ThemeToggle'
-import { community, getDocsRepositoryBase } from '../lib/surfaces'
+import { brand, community, getDocsRepositoryBase } from '../lib/surfaces'
 
 export const metadata = {
   title: {
-    default: 'isA Platform Documentation',
-    template: '%s | isA Docs'
+    default: brand.longName,
+    template: `%s | ${brand.short} Docs`
   },
   description: 'Build, deploy, and scale intelligent AI agents with the complete isA platform. Agent SDK, 190+ MCP tools, Model gateway, and production-ready infrastructure.',
   keywords: ['AI agents', 'LLM', 'Agent SDK', 'MCP', 'Kubernetes', 'AI platform'],
-  authors: [{ name: 'isA Platform' }],
+  authors: [{ name: brand.name }],
   openGraph: {
-    title: 'isA Platform Documentation',
+    title: brand.longName,
     description: 'Build, deploy, and scale intelligent AI agents',
     type: 'website',
   },
@@ -37,7 +37,7 @@ const Logo = () => (
       <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
       <path d="M8 12h8M12 8v8" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
     </svg>
-    <span>isA</span>
+    <span>{brand.short}</span>
   </span>
 )
 
@@ -46,7 +46,7 @@ const FooterContent = () => (
     <div className="flex flex-col md:flex-row justify-between items-center gap-4 py-4">
       <div className="flex items-center gap-4">
         <span className="text-sm text-muted">
-          © {new Date().getFullYear()} isA Platform. Open Source.
+          © {new Date().getFullYear()} {brand.name}. Open Source.
         </span>
       </div>
       <div className="flex items-center gap-6">
