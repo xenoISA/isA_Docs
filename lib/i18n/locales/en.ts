@@ -29,7 +29,7 @@ export const docsEn: Record<string, string> = {
 
   // Footer
   'footer.edit_page': 'Edit this page on GitHub',
-  'footer.copyright': '© {{year}} isA Platform. Open Source.',
+  'footer.copyright': '© {{year}} {{brand}}. Open Source.',
 
   // Theme
   'theme.light': 'Switch to light theme',

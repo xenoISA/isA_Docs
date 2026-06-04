@@ -25,7 +25,7 @@ export const docsZh: Record<string, string> = {
   'error.back_to_docs': '返回文档',
 
   'footer.edit_page': '在 GitHub 上编辑此页面',
-  'footer.copyright': '© {{year}} isA 平台。开源项目。',
+  'footer.copyright': '© {{year}} {{brand}} 平台。开源项目。',
 
   'theme.light': '切换到浅色主题',
   'theme.dark': '切换到深色主题',
