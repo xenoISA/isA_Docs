@@ -24,6 +24,14 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV HOSTNAME=0.0.0.0
 ENV PORT=4300
 
+# Runtime brand (#332 / ADR 0007): the brand is NOT baked into the image. The
+# site chrome reads NON-public BRAND_* env on the server at request time, so this
+# single edition-agnostic image is rebranded purely at container start:
+#   docker run -e BRAND_NAME=SN \
+#              -e BRAND_SHORT=SN \
+#              -e BRAND_LONG_NAME="SN Platform Documentation" ...
+# Unset = isA defaults (see lib/brand.ts). No NEXT_PUBLIC_BRAND_* build args.
+
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs
 

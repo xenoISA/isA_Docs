@@ -15,6 +15,7 @@ import {
   getAvailableLocales,
 } from '@isa/core';
 import { docsEn, docsZh, docsRu } from './locales';
+import { useBrand } from '../brand-context';
 
 type InterpolationValues = Record<string, string | number>;
 
@@ -45,6 +46,10 @@ const I18nContext = createContext<I18nContextValue | null>(null);
 
 export function I18nProvider({ children }: { children: ReactNode }) {
   const [locale, setLocaleState] = useState(getLocale());
+  // Runtime brand (#332): expose the brand short name as a default interpolation
+  // value so locale strings like 'footer.copyright' ('{{brand}}') resolve to the
+  // brand chosen at container start. Caller-supplied values still win.
+  const brand = useBrand();
 
   useEffect(() => {
     const stored = typeof window !== 'undefined' ? localStorage.getItem('isa.locale') : null;
@@ -64,20 +69,20 @@ export function I18nProvider({ children }: { children: ReactNode }) {
 
   const t = useCallback(
     (key: string, values?: InterpolationValues) => {
+      // Brand fields are available to every string; explicit caller values win.
+      // `brand` maps the locale `{{brand}}` token to the runtime short name.
+      const merged: InterpolationValues = { brand: brand.short, ...values };
       const strings = docsLocales[locale] || docsLocales['en'];
       let result = strings?.[key];
       if (result === undefined && locale !== 'en') {
         result = docsLocales['en']?.[key];
       }
       if (result === undefined) {
-        return sdkT(key, values);
+        return sdkT(key, merged);
       }
-      if (values) {
-        result = interpolate(result, values);
-      }
-      return result;
+      return interpolate(result, merged);
     },
-    [locale],
+    [locale, brand],
   );
 
   return (
