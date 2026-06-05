@@ -36,22 +36,12 @@ export const community = {
   twitter: process.env.NEXT_PUBLIC_TWITTER_URL || 'https://twitter.com/isA_platform',
 } as const
 
-/**
- * Customer-visible brand chrome — env-driven so white-label deployments can
- * override the displayed name without code changes. Defaults reproduce the
- * current hard-coded strings exactly.
- *
- * NOTE: This covers site CHROME only (titles, logo, footer). Prose mentions in
- * MDX content (~363) are a separate build-time tokenization effort (follow-up).
- */
-export const brand = {
-  /** Full platform name, e.g. used as metadata author */
-  name: process.env.NEXT_PUBLIC_BRAND_NAME ?? 'isA Platform',
-  /** Short brand mark, e.g. logo text and title template suffix */
-  short: process.env.NEXT_PUBLIC_BRAND_SHORT ?? 'isA',
-  /** Long documentation title, e.g. default page title / OG title */
-  longName: process.env.NEXT_PUBLIC_BRAND_LONG_NAME ?? 'isA Platform Documentation',
-} as const
+// Customer-visible brand chrome moved to runtime config (#332 / ADR 0007):
+// see `lib/brand.ts` (pure type + defaults + resolveBrand), `lib/brand.server.ts`
+// (server runtime reader), and `lib/brand-context.tsx` (client hydration). The
+// brand is now read from NON-public `BRAND_*` server env at request time so one
+// edition-agnostic image can be rebranded at container start, instead of being
+// inlined from `NEXT_PUBLIC_BRAND_*` at build time.
 
 /** Docs-specific repo config */
 export const docsRepo = {
