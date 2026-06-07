@@ -1,46 +1,38 @@
-# ── Stage 1: Install dependencies ────────────────────────────
-FROM node:22-alpine AS deps
+FROM node:20-alpine AS base
+RUN apk add --no-cache libc6-compat
+
+# ---------- deps ----------
+# Combined pnpm workspace: docs (.) + isA_App_SDK/packages/* (nested by CI).
+# Resolves @xenoisa/* SDK packages + their internal workspace:* deps in one
+# install. pnpm-workspace.yaml lists both; .npmrc hoists shared SDK build deps.
+FROM base AS deps
 WORKDIR /app
-
-COPY package.json package-lock.json* ./
-RUN npm ci --ignore-scripts
-
-# ── Stage 2: Build ───────────────────────────────────────────
-FROM node:22-alpine AS builder
-WORKDIR /app
-
-COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+RUN corepack enable && corepack prepare pnpm@9.15.4 --activate && \
+    pnpm install --no-frozen-lockfile
 
-ENV NEXT_TELEMETRY_DISABLED=1
-RUN npm run build
-
-# ── Stage 3: Production runtime ──────────────────────────────
-FROM node:22-alpine AS runner
+# ---------- build ----------
+FROM base AS builder
 WORKDIR /app
+COPY --from=deps /app ./
+ENV NEXT_TELEMETRY_DISABLED=1
+# SDK dist/ is gitignored — build the @xenoisa/* packages (topological) before
+# next build. Brand-agnostic build (#332/ADR0007): BRAND_* read at runtime.
+RUN corepack enable && corepack prepare pnpm@9.15.4 --activate && \
+    pnpm -r --filter "./isA_App_SDK/packages/**" run build && \
+    npm run build
 
+# ---------- runner ----------
+FROM base AS runner
+WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV HOSTNAME=0.0.0.0
 ENV PORT=4300
-
-# Runtime brand (#332 / ADR 0007): the brand is NOT baked into the image. The
-# site chrome reads NON-public BRAND_* env on the server at request time, so this
-# single edition-agnostic image is rebranded purely at container start:
-#   docker run -e BRAND_NAME=SN \
-#              -e BRAND_SHORT=SN \
-#              -e BRAND_LONG_NAME="SN Platform Documentation" ...
-# Unset = isA defaults (see lib/brand.ts). No NEXT_PUBLIC_BRAND_* build args.
-
-RUN addgroup --system --gid 1001 nodejs && \
-    adduser --system --uid 1001 nextjs
-
-# Copy standalone output + static assets
+RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nextjs
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
-
 USER nextjs
 EXPOSE 4300
-
 CMD ["node", "server.js"]

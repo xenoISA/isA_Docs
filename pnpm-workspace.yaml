@@ -1,0 +1,3 @@
+packages:
+  - '.'
+  - 'isA_App_SDK/packages/*'

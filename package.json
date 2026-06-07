@@ -22,8 +22,8 @@
   "author": "isA Team",
   "license": "MIT",
   "dependencies": {
-    "@isa/core": "file:../isA_App_SDK/packages/core",
-    "@isa/ui-web": "file:../isA_App_SDK/packages/ui-web",
+    "@xenoisa/core": "workspace:*",
+    "@xenoisa/ui-web": "workspace:*",
     "@opentelemetry/auto-instrumentations-web": "^0.59.0",
     "@opentelemetry/core": "^2.6.1",
     "@opentelemetry/exporter-trace-otlp-http": "^0.214.0",
@@ -43,6 +43,8 @@
     "web-vitals": "^5.2.0"
   },
   "devDependencies": {
+    "zod": "^3.22.0",
+    "@faker-js/faker": "^8.0.0",
     "@types/node": "20.19.30",
     "@types/pg": "^8.20.0",
     "@types/react": "19.2.10",
