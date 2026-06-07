@@ -1,6 +1,6 @@
 'use client';
 
-import { PlatformNav } from '@isa/ui-web';
+import { PlatformNav } from '@xenoisa/ui-web';
 import type { ComponentType } from 'react';
 
 type PlatformNavProps = {

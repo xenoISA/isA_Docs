@@ -13,7 +13,7 @@ import {
   setLocale as coreSetLocale,
   getLocale,
   getAvailableLocales,
-} from '@isa/core';
+} from '@xenoisa/core';
 import { docsEn, docsZh, docsRu } from './locales';
 import { useBrand } from '../brand-context';
 
