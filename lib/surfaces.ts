@@ -1,7 +1,7 @@
 /**
  * Surface URL configuration — env-driven cross-surface routing.
  *
- * Follows the same pattern as @isa/core's gatewayConfig: every external
+ * Follows the same pattern as @xenoisa/core's gatewayConfig: every external
  * URL that the docs shell references is resolved from an env var with a
  * sensible default so `npm run dev` works out of the box.
  *
