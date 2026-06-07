@@ -1,0 +1,2 @@
+# Keeps the public/ dir present so the Next standalone Dockerfile
+# `COPY /app/public ./public` succeeds even with no static assets.
