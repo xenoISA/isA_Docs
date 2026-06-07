@@ -43,7 +43,6 @@
     "web-vitals": "^5.2.0"
   },
   "devDependencies": {
-    "zod": "^3.22.0",
     "@faker-js/faker": "^8.0.0",
     "@types/node": "20.19.30",
     "@types/pg": "^8.20.0",
