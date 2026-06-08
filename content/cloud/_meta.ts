@@ -4,7 +4,7 @@ export default {
   'grpc-services': 'gRPC Services',
   gateway: 'API Gateway',
   discovery: 'Service Discovery',
-  sdk: 'SDK (isA_common)',
+  sdk: 'SDK (common)',
   deployment: 'Deployment',
   cicd: 'CI/CD',
   testing: 'Testing',
