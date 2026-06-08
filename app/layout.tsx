@@ -15,8 +15,13 @@ import type { Brand } from '../lib/brand'
 import { community, getDocsRepositoryBase } from '../lib/surfaces'
 
 // Runtime brand (#332 / ADR 0007): read from server env per request so a single
-// image can be rebranded at container start. generateMetadata() (not a static
-// metadata export) ensures the title/template/author/OG reflect the runtime value.
+// edition-agnostic image can be rebranded at container start. `force-dynamic`
+// is REQUIRED — without it Next prerenders these pages at build time and bakes
+// the build-time (default isA) brand into the static HTML, so the runtime
+// BRAND_* env never takes effect. Dynamic rendering makes generateMetadata +
+// getBrand() run per request, honouring the deployed edition's brand.
+export const dynamic = 'force-dynamic'
+
 export function generateMetadata(): Metadata {
   const brand = getBrand()
   return {
@@ -25,7 +30,7 @@ export function generateMetadata(): Metadata {
       template: `%s | ${brand.short} Docs`,
     },
     description:
-      'Build, deploy, and scale intelligent AI agents with the complete isA platform. Agent SDK, 190+ MCP tools, Model gateway, and production-ready infrastructure.',
+      `Build, deploy, and scale intelligent AI agents with the complete ${brand.short} platform. Agent SDK, 190+ MCP tools, Model gateway, and production-ready infrastructure.`,
     keywords: ['AI agents', 'LLM', 'Agent SDK', 'MCP', 'Kubernetes', 'AI platform'],
     authors: [{ name: brand.name }],
     openGraph: {
