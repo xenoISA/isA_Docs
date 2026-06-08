@@ -13,6 +13,7 @@ import {
   AISearch,
   ErrorBoundary,
 } from './components'
+import { BrandShort } from './components/BrandShort'
 
 const docsComponents = getDocsMDXComponents()
 
@@ -50,6 +51,9 @@ const customComponents = {
 
   // Error boundary (available directly in MDX)
   ErrorBoundary,
+
+  // Runtime brand token (injected by remark-brand for prose "isA" mentions)
+  BrandShort,
 }
 
 export function useMDXComponents(components?: Record<string, React.ComponentType>) {
