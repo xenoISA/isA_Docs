@@ -1,6 +1,11 @@
 import Link from 'next/link'
+import { getBrand } from '../lib/brand.server'
 
+// Runtime brand (#332 / ADR 0007): server component reads BRAND_* per request so
+// the landing prose rebrands per edition without a rebuild. force-dynamic is
+// inherited from app/layout.tsx, so getBrand() runs at request time.
 export default function HomePage() {
+  const brand = getBrand()
   return (
     <div className="min-h-screen bg-background text-foreground">
       {/* Hero */}
@@ -10,7 +15,7 @@ export default function HomePage() {
             Build intelligent AI agents
           </h1>
           <p className="mt-6 text-lg text-muted leading-relaxed">
-            The isA platform provides everything you need to build, deploy, and manage AI agents.
+            The {brand.short} platform provides everything you need to build, deploy, and manage AI agents.
             From simple chatbots to complex autonomous systems with tool use, human oversight, and durable execution.
           </p>
           <div className="mt-8 flex flex-wrap gap-4">
