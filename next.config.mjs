@@ -2,6 +2,7 @@ import nextra from 'nextra'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import { createRequire } from 'module'
+import remarkBrand from './lib/remark-brand.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const require = createRequire(import.meta.url)
@@ -29,6 +30,11 @@ const nextraZodV4 = resolveZodFrom('nextra/package.json')
 const withNextra = nextra({
   contentDirBasePath: '/content',
   defaultShowCopyCode: true,
+  // Tokenize the brand word in prose to <BrandShort/> so docs content rebrands
+  // at runtime per edition (#332) — keeps one edition-agnostic docs image.
+  mdxOptions: {
+    remarkPlugins: [remarkBrand],
+  },
 })
 
 export default withNextra({
